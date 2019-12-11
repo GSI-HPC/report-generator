@@ -30,6 +30,8 @@ import dataset.item_handler as ih
 
 import filter.group_filter_handler as gf
 
+from decimal import Decimal
+
 from chart.quota_pct_bar_chart import QuotaPctBarChart
 from chart.usage_quota_bar_chart import UsageQuotaBarChart
 from chart.usage_pie_chart import UsagePieChart
@@ -46,7 +48,8 @@ def create_weekly_reports(local_mode,
                           quota_pct_bar_chart,
                           usage_quota_bar_chart,
                           usage_pie_chart,
-                          num_top_groups):
+                          num_top_groups,
+                          storage_multiplier):
 
     reports_path_list = list()
 
@@ -57,7 +60,7 @@ def create_weekly_reports(local_mode,
         
         # TODO: create dummy list with variable parameter
         group_info_list = ih.create_dummy_group_info_list()
-        storage_total_size = 18458963071860736
+        storage_total_size = 18458963071860736 * Decimal(storage_multiplier)
 
     else:
         
@@ -159,6 +162,7 @@ def main():
         usage_pie_chart = config.get('usage_pie_chart', 'filename')
         
         num_top_groups = config.getint('usage_pie_chart', 'num_top_groups')
+        mul = config.getfloat('usage_pie_chart', 'storage_multiplier')
 
         chart_path_list = \
             create_weekly_reports(local_mode,
@@ -168,7 +172,8 @@ def main():
                                   quota_pct_bar_chart,
                                   usage_quota_bar_chart,
                                   usage_pie_chart,
-                                  num_top_groups)
+                                  num_top_groups,
+                                  mul)
 
         if transfer_mode == 'on':
 
