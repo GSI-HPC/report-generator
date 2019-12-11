@@ -70,7 +70,9 @@ def create_weekly_reports(local_mode,
             gf.filter_group_info_items(
                 ldh.create_group_info_list(group_names_list, file_system))
 
-        storage_total_size = ldh.lustre_total_size(file_system)
+        storage_total_size = \
+            ldh.lustre_total_size(file_system) * Decimal(storage_multiplier)
+
     
     # QUOTA-PCT-BAR-CHART
     title = "Group Quota Usage on %s" % fs_long_name
