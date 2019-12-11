@@ -1,5 +1,5 @@
 Name:       lustre-reports
-Version:    0.4.2
+Version:    0.4.3
 Release:    1
 Summary:    Report Generator for Lustre FS
 License:    GPLv3
