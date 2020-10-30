@@ -30,6 +30,9 @@ from dataset.item_handler import GroupInfoItem
 
 LFS_BIN = '/usr/bin/lfs'
 
+REGEX_STR_QUOTA_CAPTION = r"^\s+Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
+REGEX_PATTERN_QUOTA_CAPTION = re.compile(REGEX_STR_QUOTA_CAPTION)
+
 
 def check_path_exists(path):
 
@@ -94,7 +97,7 @@ def create_group_info_item(gid, fs):
 
     check_path_exists(fs)
 
-    # Example output of 'lfs quota' for group 'rz':
+    # Example output of 'lfs quota -g rz /lustre':
     #
     ## Disk quotas for grp rz (gid 1002):      
     ## Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
@@ -109,9 +112,16 @@ def create_group_info_item(gid, fs):
 
     lines = output.rstrip().split('\n')
 
-    if len(lines) != 3:
-        raise RuntimeError("'lfs quota' returned unexpected output:\n%s"
-            % output)
+    if len(lines) < 3:
+        raise RuntimeError("'lfs quota' output is to short:\n%s" % output)
+
+    # Check caption line of 'lfs quota' fits the expected line:
+    caption_line = lines[1]
+    match = REGEX_PATTERN_QUOTA_CAPTION.fullmatch(caption_line)
+
+    if not match:
+        raise RuntimeError(
+            f"lfs quota caption line: '{caption_line}' did not match the regex: '{REGEX_STR_QUOTA_CAPTION}'")
 
     fields_line = lines[2].strip()
 
