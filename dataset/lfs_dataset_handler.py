@@ -78,7 +78,14 @@ def create_group_info_list(group_names, fs):
     for grp_name in group_names:
 
         try:
-            group_info_item_list.append(create_group_info_item(grp_name, fs))
+
+            group_info = create_group_info_item(grp_name, fs)
+
+            if group_info.files > 0:
+                group_info_item_list.append(group_info)
+            else:
+                logging.debug("Skipped group since it has no files: %s" % group_info.name)
+
         except Exception as e:
 
             logging.error(
