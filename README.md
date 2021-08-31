@@ -69,7 +69,3 @@ __mysqlclient:__
 * gcc
 * MariaDB-devel
 * MariaDB-shared
-
-## Dependency Matrix
-
-**TODO** - which component depends on which class and package/component
