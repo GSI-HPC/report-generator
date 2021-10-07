@@ -63,8 +63,11 @@ def create_weekly_reports(local_mode,
         group_info_list = ih.create_dummy_group_info_list()
         if input_file:
             # TODO: create dummy list with variable parameter
-            storage_total_size = ldh.lustre_total_size_ost(input_file, file_system) * Decimal(storage_multiplier)
-            logging.debug("Total storage: %s" % ldh.lustre_total_size_ost(input_file, file_system))
+            storage_info = ldh.create_storage_info(input_file)
+            if not file_system in storage_info:
+                raise RuntimeError("storage information doesn't hold file system %" % file_system)
+            storage_total_size = storage_info[file_system].ost.total * Decimal(storage_multiplier)
+            logging.debug("Total storage: %s" % ldh.create_storage_info(input_file))
         else:
             storage_total_size = 18458963071860736 * Decimal(storage_multiplier)
 

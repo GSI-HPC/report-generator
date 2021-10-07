@@ -153,8 +153,6 @@ def create_group_info_item(gid, fs):
 
     return GroupInfoItem(gid, bytes_used, bytes_quota, files)
 
-storage_dict = {}
-
 class StorageInfo:
     """Class for storing MDT and OST information"""
 
@@ -236,7 +234,15 @@ class StorageInfo:
             return used_percentage
 
 def create_storage_info(input_data):
-    """Calculate total size from input-data"""
+    """Generates data structure and calculates storage information of given file system.
+
+    Parameters:
+    input_data (str): Result of the `lfs df` command or read file created from it.
+
+    Return value:
+    storage_dict (dict): Dictionary containing OST and MDT space usage information.
+    """
+    storage_dict = {}
 
     if not isinstance(input_data, str):
         logging.debug("input_data: %r", input_data)
@@ -324,6 +330,4 @@ def create_storage_info(input_data):
             storage_dict[key].ost.total, storage_dict[key].ost.used, storage_dict[key].ost.free,
             storage_dict[key].ost.used_percentage())
 
-def lustre_total_size_ost(ldh_input_file, file_system):
-    create_storage_info(ldh_input_file)
-    return storage_dict[file_system].ost.total
+    return storage_dict
