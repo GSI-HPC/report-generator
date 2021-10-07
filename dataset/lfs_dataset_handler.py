@@ -245,7 +245,6 @@ def create_storage_info(input_data):
     storage_dict = {}
 
     if not isinstance(input_data, str):
-        logging.debug("input_data: %r", input_data)
         raise RuntimeError('expected input data to be string, got: ' + str(type(input_data)))
 
     header_reg_pattern = r'UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*'
@@ -263,7 +262,7 @@ def create_storage_info(input_data):
 
     header_found = False
     tail_found = False
-    mount_point_info = "undefined"
+    mount_point_info = None
 
     for line in input_data.splitlines():
 
@@ -283,7 +282,7 @@ def create_storage_info(input_data):
             header_found = True
             tail_found = False
         elif mdt_result:
-            if mount_point_info == "undefined":
+            if not mount_point_info:
                 mount_point_info = mdt_result.group(6)
                 storage_dict[mount_point_info] = StorageInfo(mount_point_info)
                 storage_dict[mount_point_info].mdt.total += int(mdt_result.group(2))
@@ -294,7 +293,7 @@ def create_storage_info(input_data):
                 storage_dict[mount_point_info].mdt.used += int(mdt_result.group(3))
                 storage_dict[mount_point_info].mdt.free += int(mdt_result.group(4))
         elif ost_result:
-            if mount_point_info == "undefined":
+            if not mount_point_info:
                 mount_point_info = ost_result.group(6)
                 storage_dict[mount_point_info] = StorageInfo(mount_point_info)
                 storage_dict[mount_point_info].ost.total += int(ost_result.group(2))

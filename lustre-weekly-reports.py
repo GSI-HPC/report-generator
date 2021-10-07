@@ -132,18 +132,18 @@ def main():
         required=False, action='store_true', 
         help='Enables local_mode program execution.')
 
-    parser.add_argument('-i', '--input-file', dest='storage_input_file', 
+    parser.add_argument('-i', '--input-file', dest='input_file', 
         type=str, required=False, help='Path of the input file.')
 
     args = parser.parse_args()
 
-    if not args.enable_local and args.storage_input_file:
-        raise RuntimeError("Local mode must be given when given input file.")
+    if not args.enable_local and args.input_file:
+        raise RuntimeError("Local mode must be enabled to provide an input file.")
 
-    if args.storage_input_file:
-        if not os.path.isfile(args.storage_input_file):
+    if args.enable_local and args.input_file:
+        if not os.path.isfile(args.input_file):
             raise IOError("The input file does not exist or is not a file: %s" % 
-                args.storage_input_file)
+                args.input_file)
 
     if not os.path.isfile(args.config_file):
         raise IOError("The config file does not exist or is not a file: %s" % 
@@ -186,14 +186,11 @@ def main():
         num_top_groups = config.getint('usage_pie_chart', 'num_top_groups')
         mul = config.getfloat('usage_pie_chart', 'storage_multiplier')
 
-        input_file = args.storage_input_file
+        input_file = args.input_file
 
         if input_file:
             with open(input_file, "r") as storage_file:
                 input_file = storage_file.read()
-        else:
-            #input_file = check_output(["lfs", "df"]).decode()
-            input_file = check_output(["lfs", "df"]).decode()
 
         chart_path_list = \
             create_weekly_reports(local_mode,
