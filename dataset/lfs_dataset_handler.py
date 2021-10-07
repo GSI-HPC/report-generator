@@ -153,4 +153,177 @@ def create_group_info_item(gid, fs):
 
     return GroupInfoItem(gid, bytes_used, bytes_quota, files)
 
+storage_dict = {}
 
+class StorageInfo:
+    """Class for storing MDT and OST information"""
+
+    def __init__(self, mount_point):
+        self._mount_point = mount_point
+        self.mdt = self.StorageComponent()
+        self.ost = self.StorageComponent()
+
+    @property
+    def mount_point(self):
+        """Get mount point"""
+        return self._mount_point
+
+    @mount_point.setter
+    def mount_point(self, mount_point):
+        if mount_point[0] == '/':
+            self._mount_point = mount_point
+        else:
+            raise RuntimeError("input file may be corrupt")
+
+    class StorageComponent:
+        """Class for initializing components"""
+
+        def __init__(self):
+            self.total = 0
+            self.used = 0
+            self.free = 0
+
+        @property
+        def total(self):
+            """Get total storage"""
+            return self._total
+
+        @property
+        def used(self):
+            """Get used storage"""
+            return self._used
+
+        @property
+        def free(self):
+            """Get free storage"""
+            return self._free
+
+        @total.setter
+        def total(self, total):
+            """Set total storage"""
+            if not isinstance(total, int):
+                #pass
+                raise TypeError('total argument must be int type.')
+
+            self._total = total
+
+        @used.setter
+        def used(self, used):
+            """Set used storage"""
+
+            if not isinstance(used, int):
+                raise TypeError('used argument must be int type.')
+
+            self._used = used
+
+        @free.setter
+        def free(self, free):
+            """Set free storage"""
+
+            if not isinstance(free, int):
+                raise TypeError('free argument must be int type.')
+
+            self._free = free
+
+        def used_percentage(self):
+            """Calculate total used storage percentage"""
+
+            used_percentage = (self.used / self.total) * 100
+
+            if used_percentage > 100:
+                raise RuntimeError('percentage cannot be greater than 100')
+
+            return used_percentage
+
+def create_storage_info(input_data):
+    """Calculate total size from input-data"""
+
+    if not isinstance(input_data, str):
+        logging.debug("input_data: %r", input_data)
+        raise RuntimeError('expected input data to be string, got: ' + str(type(input_data)))
+
+    header_reg_pattern = r'UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*'
+    header_reg_comp = re.compile(header_reg_pattern)
+    mdt_reg_pattern = r"""
+    ([\d|\w]+-MDT[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[MDT:[\d|\w]+\]
+    """
+    mdt_reg_comp = re.compile(mdt_reg_pattern, re.VERBOSE)
+    ost_reg_pattern = r"""
+    ([\d|\w]+-OST[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[OST:[\d|\w]+\]
+    """
+    ost_reg_comp = re.compile(ost_reg_pattern, re.VERBOSE)
+    tail_reg_pattern = r'filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w]+)'
+    tail_reg_comp = re.compile(tail_reg_pattern)
+
+    header_found = False
+    tail_found = False
+    mount_point_info = "undefined"
+
+    for line in input_data.splitlines():
+
+        stripped_line = line.strip()
+
+        if not stripped_line:
+            continue
+
+        header_result = header_reg_comp.match(stripped_line)
+        mdt_result = mdt_reg_comp.match(stripped_line)
+        ost_result = ost_reg_comp.match(stripped_line)
+        tail_result = tail_reg_comp.match(stripped_line)
+
+        if header_result:
+            if header_found:
+                raise RuntimeError("header found before tail")
+            header_found = True
+            tail_found = False
+        elif mdt_result:
+            if mount_point_info == "undefined":
+                mount_point_info = mdt_result.group(6)
+                storage_dict[mount_point_info] = StorageInfo(mount_point_info)
+                storage_dict[mount_point_info].mdt.total += int(mdt_result.group(2))
+                storage_dict[mount_point_info].mdt.used += int(mdt_result.group(3))
+                storage_dict[mount_point_info].mdt.free += int(mdt_result.group(4))
+            else:
+                storage_dict[mount_point_info].mdt.total += int(mdt_result.group(2))
+                storage_dict[mount_point_info].mdt.used += int(mdt_result.group(3))
+                storage_dict[mount_point_info].mdt.free += int(mdt_result.group(4))
+        elif ost_result:
+            if mount_point_info == "undefined":
+                mount_point_info = ost_result.group(6)
+                storage_dict[mount_point_info] = StorageInfo(mount_point_info)
+                storage_dict[mount_point_info].ost.total += int(ost_result.group(2))
+                storage_dict[mount_point_info].ost.used += int(ost_result.group(3))
+                storage_dict[mount_point_info].ost.free += int(ost_result.group(4))
+            else:
+                storage_dict[mount_point_info].ost.total += int(ost_result.group(2))
+                storage_dict[mount_point_info].ost.used += int(ost_result.group(3))
+                storage_dict[mount_point_info].ost.free += int(ost_result.group(4))
+        elif tail_result:
+            if tail_found or not header_found:
+                raise RuntimeError("tail found before header")
+            header_found = False
+            tail_found = True
+            mount_point_info = "undefined"
+        else:
+            logging.error('line mismatch, skipped line: %s', stripped_line)
+
+    #Debug
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        for key in storage_dict:
+            logging.debug('''Mounted on: %s
+            MDT-Total: %s
+            MDT-Used: %s
+            MDT-Free: %s
+            MDT-Percent: %s
+            OST-Total: %s
+            OST-Used: %s
+            OST-Free: %s
+            OST-Percent: %s''',
+            key, storage_dict[key].mdt.total, storage_dict[key].mdt.used,
+            storage_dict[key].mdt.free, storage_dict[key].mdt.used_percentage(),
+            storage_dict[key].ost.total, storage_dict[key].ost.used, storage_dict[key].ost.free,
+            storage_dict[key].ost.used_percentage())
+
+def lustre_total_size_ost(ldh_input_file, file_system):
+    create_storage_info(ldh_input_file)
+    return storage_dict[file_system].ost.total

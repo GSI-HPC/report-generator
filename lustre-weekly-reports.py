@@ -40,6 +40,7 @@ from utils.matplotlib_ import check_matplotlib_version
 from utils.rsync_ import transfer_report
 from utils.getent_group import get_user_groups
 
+from subprocess import check_output
 
 def create_weekly_reports(local_mode,
                           chart_dir,
@@ -49,7 +50,8 @@ def create_weekly_reports(local_mode,
                           usage_quota_bar_chart,
                           usage_pie_chart,
                           num_top_groups,
-                          storage_multiplier):
+                          storage_multiplier,
+                          input_file=None):
 
     reports_path_list = list()
 
@@ -57,13 +59,17 @@ def create_weekly_reports(local_mode,
     storage_total_size = 0
 
     if local_mode:
-        
-        # TODO: create dummy list with variable parameter
+
         group_info_list = ih.create_dummy_group_info_list()
-        storage_total_size = 18458963071860736 * Decimal(storage_multiplier)
+        if input_file:
+            # TODO: create dummy list with variable parameter
+            storage_total_size = ldh.lustre_total_size_ost(input_file, file_system) * Decimal(storage_multiplier)
+            logging.debug("Total storage: %s" % ldh.lustre_total_size_ost(input_file, file_system))
+        else:
+            storage_total_size = 18458963071860736 * Decimal(storage_multiplier)
 
     else:
-        
+
         group_names_list = get_user_groups()
 
         group_info_list = \
@@ -73,7 +79,7 @@ def create_weekly_reports(local_mode,
         storage_total_size = \
             ldh.lustre_total_size(file_system) * Decimal(storage_multiplier)
 
-    
+
     # QUOTA-PCT-BAR-CHART
     title = "Group Quota Usage on %s" % fs_long_name
     chart_path = chart_dir + os.path.sep + quota_pct_bar_chart
@@ -111,19 +117,30 @@ def create_weekly_reports(local_mode,
 def main():
 
     parser = argparse.ArgumentParser(description='Storage Report Generator.')
-    
+
     parser.add_argument('-f', '--config-file', dest='config_file', 
         type=str, required=True, help='Path of the config file.')
-    
+
     parser.add_argument('-D', '--enable-debug', dest='enable_debug', 
         required=False, action='store_true', 
         help='Enables logging of debug messages.')
-    
+
     parser.add_argument('-L', '--enable-local_mode', dest='enable_local', 
         required=False, action='store_true', 
         help='Enables local_mode program execution.')
 
+    parser.add_argument('-i', '--input-file', dest='storage_input_file', 
+        type=str, required=False, help='Path of the input file.')
+
     args = parser.parse_args()
+
+    if not args.enable_local and args.storage_input_file:
+        raise RuntimeError("Local mode must be given when given input file.")
+
+    if args.storage_input_file:
+        if not os.path.isfile(args.storage_input_file):
+            raise IOError("The input file does not exist or is not a file: %s" % 
+                args.storage_input_file)
 
     if not os.path.isfile(args.config_file):
         raise IOError("The config file does not exist or is not a file: %s" % 
@@ -158,13 +175,22 @@ def main():
 
         file_system = config.get('storage', 'file_system')
         fs_long_name = config.get('storage', 'fs_long_name')
-        
+
         quota_pct_bar_chart = config.get('quota_pct_bar_chart', 'filename')
         usage_quota_bar_chart = config.get('usage_quota_bar_chart', 'filename')
         usage_pie_chart = config.get('usage_pie_chart', 'filename')
-        
+
         num_top_groups = config.getint('usage_pie_chart', 'num_top_groups')
         mul = config.getfloat('usage_pie_chart', 'storage_multiplier')
+
+        input_file = args.storage_input_file
+
+        if input_file:
+            with open(input_file, "r") as storage_file:
+                input_file = storage_file.read()
+        else:
+            #input_file = check_output(["lfs", "df"]).decode()
+            input_file = check_output(["lfs", "df"]).decode()
 
         chart_path_list = \
             create_weekly_reports(local_mode,
@@ -175,7 +201,8 @@ def main():
                                   usage_quota_bar_chart,
                                   usage_pie_chart,
                                   num_top_groups,
-                                  mul)
+                                  mul,
+                                  input_file)
 
         if transfer_mode == 'on':
 
@@ -185,7 +212,7 @@ def main():
         logging.info('END')
 
         return 0
-   
+
     except Exception as e:
 
         exc_type, exc_obj, exc_tb = sys.exc_info()
@@ -195,7 +222,6 @@ def main():
         exc_type, str(e), filename, exc_tb.tb_lineno)
 
         logging.error(error_msg)
-
 
 if __name__ == '__main__':
    main()
