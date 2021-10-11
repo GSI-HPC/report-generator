@@ -236,11 +236,14 @@ class StorageInfo:
 def create_storage_info(input_data):
     """Generates data structure and calculates storage information of given file systems.
 
-    Parameters:
-    input_data (str): Output of `lfs df` command.
+    Args:
+        input_data (str): Output of `lfs df` command.
 
-    Return value:
-    storage_dict (dict): Dictionary containing OST and MDT space usage information.
+    Returns:
+        dict: Dictionary containing OST and MDT space usage information.
+
+    Raises:
+        RuntimeError: If input_data is not a string and if it is corrupt e.g. header found before tail or tail found before header
     """
     storage_dict = {}
 
