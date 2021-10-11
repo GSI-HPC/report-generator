@@ -234,10 +234,10 @@ class StorageInfo:
             return used_percentage
 
 def create_storage_info(input_data):
-    """Generates data structure and calculates storage information of given file system.
+    """Generates data structure and calculates storage information of given file systems.
 
     Parameters:
-    input_data (str): Result of the `lfs df` command or read file created from it.
+    input_data (str): Output of `lfs df` command.
 
     Return value:
     storage_dict (dict): Dictionary containing OST and MDT space usage information.
@@ -308,7 +308,7 @@ def create_storage_info(input_data):
                 raise RuntimeError("tail found before header")
             header_found = False
             tail_found = True
-            mount_point_info = "undefined"
+            mount_point_info = None
         else:
             logging.error('line mismatch, skipped line: %s', stripped_line)
 
