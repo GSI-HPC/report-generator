@@ -29,7 +29,6 @@ from decimal import Decimal
 import dataset.item_handler as ih
 import filter.group_filter_handler as gf
 
-from dataset.lfs_dataset_handler import lustre_total_size
 from dataset.lfs_dataset_handler import create_group_info_list
 from chart.group_files_migration_bar_chart import GroupFilesMigrationBarChart
 
@@ -43,7 +42,6 @@ def create_report(local_mode, chart_dir, fs1_name, fs2_name, config):
 
     reports_path_list = list()
     group_info_list = list()
-    storage_total_size = 0
 
     if local_mode:
         group_info_list = ih.create_dummy_group_files_migration_info_list()
@@ -63,41 +61,41 @@ def create_report(local_mode, chart_dir, fs1_name, fs2_name, config):
 
         group1_info_items = gf.filter_group_info_items(g1_info_list)
         group2_info_items = gf.filter_group_info_items(g2_info_list)
-        
+
         for gid in group_names:
-            
+
             fs1_files = Decimal(0)
             fs2_files = Decimal(0)
-            
+
             for group1_info_item in group1_info_items:
-                
+
                 if gid in group1_info_item.name:
 
                     fs1_files = group1_info_item.files
                     break
 
             for group2_info_item in group2_info_items:
-                
+
                 if gid in group2_info_item.name:
 
                     fs2_files = group2_info_item.files
                     break
-            
+
             if fs1_files > files_threshold or fs2_files > files_threshold:
 
-                logging.debug("Append GroupFilesMigrationInfoItem(%s, %s, %s)" % 
+                logging.debug("Append GroupFilesMigrationInfoItem(%s, %s, %s)" %
                     (gid, fs1_files, fs2_files))
-    
+
                 group_info_list.append(ih.GroupFilesMigrationInfoItem(
                     gid, fs1_files, fs2_files))
 
     # GROUP-FILES-MIGRATION-BAR-CHART
     title = "Group Files Migration Lustre Nyx and Hebe"
-    
+
     chart_path = chart_dir + os.path.sep + config.get( \
         'group_files_migration_bar_chart', 'filename')
 
-    chart = GroupFilesMigrationBarChart(title, group_info_list, chart_path, 
+    chart = GroupFilesMigrationBarChart(title, group_info_list, chart_path,
                                         fs1_name, fs2_name)
 
     chart.create()
@@ -148,8 +146,8 @@ def main():
 
         fs1_name = config.get('storage', 'file_system_name_1')
         fs2_name = config.get('storage', 'file_system_name_2')
-        
-        chart_path_list = create_report(local_mode, chart_dir, 
+
+        chart_path_list = create_report(local_mode, chart_dir,
                                         fs1_name, fs2_name, config)
 
         if transfer_mode == 'on':
@@ -160,7 +158,7 @@ def main():
         logging.info('END')
 
         return 0
-   
+
     except Exception as e:
 
         exc_type, exc_obj, exc_tb = sys.exc_info()

@@ -51,7 +51,7 @@ def create_weekly_reports(local_mode,
                           usage_pie_chart,
                           num_top_groups,
                           storage_multiplier,
-                          input_file=None):
+                          input_data=None):
 
     reports_path_list = list()
 
@@ -61,13 +61,9 @@ def create_weekly_reports(local_mode,
     if local_mode:
 
         group_info_list = ih.create_dummy_group_info_list()
-        if input_file:
-            # TODO: create dummy list with variable parameter
-            storage_info = ldh.create_storage_info(input_file)
-            if not file_system in storage_info:
-                raise RuntimeError("storage information doesn't hold file system %" % file_system)
-            storage_total_size = storage_info[file_system].ost.total * Decimal(storage_multiplier)
-            logging.debug("Total storage: %s" % ldh.create_storage_info(input_file))
+
+        if input_data:
+            storage_total_size = ldh.lustre_total_size(file_system, input_data) * Decimal(storage_multiplier)
         else:
             storage_total_size = 18458963071860736 * Decimal(storage_multiplier)
 
@@ -75,13 +71,9 @@ def create_weekly_reports(local_mode,
 
         group_names_list = get_user_groups()
 
-        group_info_list = \
-            gf.filter_group_info_items(
-                ldh.create_group_info_list(group_names_list, file_system))
+        group_info_list = gf.filter_group_info_items(ldh.create_group_info_list(group_names_list, file_system))
 
-        storage_total_size = \
-            ldh.lustre_total_size(file_system) * Decimal(storage_multiplier)
-
+        storage_total_size = ldh.lustre_total_size(file_system) * Decimal(storage_multiplier)
 
     # QUOTA-PCT-BAR-CHART
     title = "Group Quota Usage on %s" % fs_long_name
@@ -121,18 +113,18 @@ def main():
 
     parser = argparse.ArgumentParser(description='Storage Report Generator.')
 
-    parser.add_argument('-f', '--config-file', dest='config_file', 
+    parser.add_argument('-f', '--config-file', dest='config_file',
         type=str, required=True, help='Path of the config file.')
 
-    parser.add_argument('-D', '--enable-debug', dest='enable_debug', 
-        required=False, action='store_true', 
+    parser.add_argument('-D', '--enable-debug', dest='enable_debug',
+        required=False, action='store_true',
         help='Enables logging of debug messages.')
 
-    parser.add_argument('-L', '--enable-local_mode', dest='enable_local', 
-        required=False, action='store_true', 
+    parser.add_argument('-L', '--enable-local_mode', dest='enable_local',
+        required=False, action='store_true',
         help='Enables local_mode program execution.')
 
-    parser.add_argument('-i', '--input-file', dest='input_file', 
+    parser.add_argument('-i', '--input-file', dest='input_file',
         type=str, required=False, help='Path of the input file.')
 
     args = parser.parse_args()
@@ -142,12 +134,10 @@ def main():
 
     if args.enable_local and args.input_file:
         if not os.path.isfile(args.input_file):
-            raise IOError("The input file does not exist or is not a file: %s" % 
-                args.input_file)
+            raise IOError("The input file does not exist or is not a file: %s" % args.input_file)
 
     if not os.path.isfile(args.config_file):
-        raise IOError("The config file does not exist or is not a file: %s" % 
-            args.config_file)
+        raise IOError("The config file does not exist or is not a file: %s" % args.config_file)
 
     logging_level = logging.ERROR
 
@@ -156,6 +146,8 @@ def main():
 
     logging.basicConfig(
         level=logging_level, format='%(asctime)s - %(levelname)s: %(message)s')
+
+    input_data = None
 
     try:
 
@@ -186,11 +178,10 @@ def main():
         num_top_groups = config.getint('usage_pie_chart', 'num_top_groups')
         mul = config.getfloat('usage_pie_chart', 'storage_multiplier')
 
-        input_file = args.input_file
+        if args.input_file:
 
-        if input_file:
-            with open(input_file, "r") as storage_file:
-                input_file = storage_file.read()
+            with open(args.input_file, "r") as input_file:
+                input_data = input_file.read()
 
         chart_path_list = \
             create_weekly_reports(local_mode,
@@ -202,7 +193,7 @@ def main():
                                   usage_pie_chart,
                                   num_top_groups,
                                   mul,
-                                  input_file)
+                                  input_data)
 
         if transfer_mode == 'on':
 
