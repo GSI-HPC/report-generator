@@ -21,84 +21,15 @@
 import configparser
 import logging
 import argparse
-import MySQLdb
 import time
 import sys
 import os
 
+import database.group_quota_collect as gqc
+
 import dataset.lfs_dataset_handler as ldh
 
-from contextlib import closing
 from utils.getent_group import get_user_groups
-
-
-def create_group_quota_history_table(config):
-
-    db = config.get('history', 'database')
-    table = config.get('history', 'table')
-
-    with closing(MySQLdb.connect(host=config.get('mysqld', 'host'),
-                                 user=config.get('mysqld', 'user'),
-                                 passwd=config.get('mysqld', 'password'),
-                                 db=db)) as conn:
-
-        with closing(conn.cursor()) as cur:
-
-            conn.autocommit(True)
-
-            sql = "USE " + db
-
-            logging.debug(sql)
-            cur.execute(sql)
-
-            sql = """
-CREATE TABLE """ + table + """ (
-   date date NOT NULL,
-   gid varbinary(127) NOT NULL DEFAULT 'unknown',
-   used bigint(20) unsigned DEFAULT NULL,
-   quota bigint(20) unsigned DEFAULT '0',
-   files bigint(20) unsigned DEFAULT '0',
-   PRIMARY KEY (gid,date)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1
-"""
-            logging.debug(sql)
-            cur.execute(sql)
-
-
-def store_group_quota(config, date, group_info_list):
-
-    table = config.get('history', 'table')
-
-    with closing(MySQLdb.connect(host=config.get('mysqld', 'host'),
-                                 user=config.get('mysqld', 'user'),
-                                 passwd=config.get('mysqld', 'password'),
-                                 db=config.get('history', 'database'))) \
-                                    as conn:
-
-        with closing(conn.cursor()) as cur:
-
-            sql = "INSERT INTO %s (date, gid, used, quota, files) VALUES" \
-                % table
-            
-            iter_list = iter(group_info_list)
-
-            item = next(iter_list)
-
-            sql += "('%s', '%s', %s, %s, %s)" \
-                % (date, item.name, item.size, item.quota, item.files)
-
-            for item in iter_list:
-                sql += ", ('%s', '%s', %s, %s, %s)" \
-                    % (date, item.name, item.size, item.quota, item.files)
-
-            logging.debug(sql)
-            cur.execute(sql)
-
-            if not cur.rowcount:
-                raise RuntimeError("Snapshot failed for date: %s." % date)
-
-            logging.debug("Inserted rows: %d into table: %s for date: %s" \
-                % (cur.rowcount, table, date))
 
 
 def main():
@@ -153,7 +84,7 @@ def main():
 
         if args.create_table:
 
-            create_group_quota_history_table(config)
+            gqc.create_group_quota_history_table(config)
             logging.info('END')
             sys.exit(0)
 
@@ -172,7 +103,7 @@ def main():
                        group_info.files))
 
         if run_mode == 'collect':
-            store_group_quota(config, date_today, group_info_list)
+            gqc.store_group_quota(config, date_today, group_info_list)
 
         logging.info('END')
         sys.exit(0)
