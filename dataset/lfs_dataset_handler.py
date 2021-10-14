@@ -121,6 +121,14 @@ def check_path_exists(path):
         raise RuntimeError("File path does not exist: %s" % path)
 
 
+def create_lfs_df_input_data(input_file=None):
+#TODO: """pydoc"""
+    if input_file:
+
+        with open(args.input_file, "r") as input_file:
+            input_data = input_file.read()
+
+
 def lustre_total_size(file_system, input_data=None):
 
     lfs_df_output = None

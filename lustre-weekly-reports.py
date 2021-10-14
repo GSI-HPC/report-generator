@@ -51,7 +51,7 @@ def create_weekly_reports(local_mode,
                           usage_pie_chart,
                           num_top_groups,
                           storage_multiplier,
-                          input_data=None):
+                          input_data=None): #TODO: change to input_file=None
 
     reports_path_list = list()
 
@@ -63,7 +63,7 @@ def create_weekly_reports(local_mode,
         group_info_list = ih.create_dummy_group_info_list()
 
         if input_data:
-            storage_total_size = ldh.lustre_total_size(file_system, input_data) * Decimal(storage_multiplier)
+            storage_total_size = ldh.lustre_total_size(file_system, input_file) * Decimal(storage_multiplier)
         else:
             storage_total_size = 18458963071860736 * Decimal(storage_multiplier)
 
@@ -178,11 +178,6 @@ def main():
         num_top_groups = config.getint('usage_pie_chart', 'num_top_groups')
         mul = config.getfloat('usage_pie_chart', 'storage_multiplier')
 
-        if args.input_file:
-
-            with open(args.input_file, "r") as input_file:
-                input_data = input_file.read()
-
         chart_path_list = \
             create_weekly_reports(local_mode,
                                   chart_dir,
@@ -193,7 +188,7 @@ def main():
                                   usage_pie_chart,
                                   num_top_groups,
                                   mul,
-                                  input_data)
+                                  input_data) #TODO: change to input_file
 
         if transfer_mode == 'on':
 
