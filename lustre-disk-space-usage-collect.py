@@ -25,7 +25,7 @@ import time
 import sys
 import os
 
-import database.create_disk_space_usage_table as dsuc
+import database.disk_space_usage_collect as dsuc
 
 import dataset.lfs_dataset_handler as ldh
 
@@ -77,13 +77,20 @@ def main():
     else:
         run_mode = args.run_mode
 
+    if not os.path.isfile(args.config_file):
+        raise IOError("The config file does not exist or is not a file: %s" % args.config_file)
+
+    if not os.path.isfile(args.input_file):
+        raise IOError("The input file does not exist or is not a file: %s" % args.input_file)
+
     input_data = None
+    input_file = None
 
     try:
         logging.info('START')
 
         date_today = time.strftime('%Y-%m-%d')
-        
+
         config = configparser.ConfigParser()
         config.read(args.config_file)
 
@@ -95,19 +102,25 @@ def main():
 
         fs = config.get('lustre', 'file_system')
 
-        #TODO: call create_lfs_df_input_data
+        if not args.input_file:
+            input_data = ldh.create_lfs_df_input_data(fs)
 
-        storage_info_list = ldh.create_storage_info()  #TODO: give result of the above
+        else:
+            input_data = ldh.create_lfs_df_input_data(fs, input_file)
+
+        storage_info_list = ldh.create_storage_info(input_data)
 
         if run_mode == 'print':
 
-            for group_info in storage_info_list:
+            pass
+            #TODO: add print mode
+            # for group_info in storage_info_list:
 
-                print("Group: %s - Used: %s - Quota: %s - Files: %s" \
-                    % (group_info.name,
-                       group_info.size, 
-                       group_info.quota, 
-                       group_info.files))
+            #     print("Group: %s - Used: %s - Quota: %s - Files: %s" \
+            #         % (group_info.name,
+            #            group_info.size, 
+            #            group_info.quota, 
+            #            group_info.files))
 
         if run_mode == 'collect':
             dsuc.store_disk_space_usage(config, date_today, storage_info_list)

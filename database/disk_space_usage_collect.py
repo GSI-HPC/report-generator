@@ -55,7 +55,7 @@ CREATE TABLE """ + table + """ (
             logging.debug(sql)
             cur.execute(sql)
 
-def store_disk_space_usage(config, date_today, ):
+def store_disk_space_usage(config, date_today, storage_info_list):
 
     table = config.get('history', 'table')
 
@@ -70,16 +70,16 @@ def store_disk_space_usage(config, date_today, ):
             sql = "INSERT INTO %s (date, mounted_on, total, free, used, used_percentage) VALUES" \
                 % table
 
-            iter_list = iter(group_info_list)
+            # iter_list = iter(storage_info_list)
 
-            item = next(iter_list)
+            # item = next(iter_list)
 
-            sql += "('%s', '%s', %s, %s, %s)" \
-                % (date, item.name, item.size, item.quota, item.files)
+            # sql += "('%s', '%s', %s, %s, %s)" \
+            #     % (date, item.name, item.size, item.quota, item.files)
 
-            for item in iter_list:
-                sql += ", ('%s', '%s', %s, %s, %s)" \
-                    % (date, item.name, item.size, item.quota, item.files)
+            for item in storage_info_list:
+                sql += ", ('%s', '%s', %s, %s, %s, %s)" \
+                    % (date, item.mount_point, item.ost.total, item.ost.free, item.ost.used, item.ost.used_percentage)
 
             logging.debug(sql)
             cur.execute(sql)

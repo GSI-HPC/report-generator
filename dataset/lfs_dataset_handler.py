@@ -61,6 +61,7 @@ class StorageInfo:
             self.total = 0
             self.used = 0
             self.free = 0
+            self.used_percentage = 0.0
 
         @property
         def total(self):
@@ -71,6 +72,11 @@ class StorageInfo:
         def used(self):
             """Get used storage"""
             return self._used
+
+        @property
+        def used_percentage(self):
+            """Get used_percentage storage"""
+            return self._used_percentage
 
         @property
         def free(self):
@@ -95,6 +101,15 @@ class StorageInfo:
 
             self._used = used
 
+        @used_percentage.setter
+        def used_percentage(self, used_percentage):
+            """Set used storage"""
+
+            if not isinstance(used_percentage, int):
+                raise TypeError("Used_percentage argument must be int type")
+
+            self._used_percentage = calc_used_percentage()
+
         @free.setter
         def free(self, free):
             """Set free storage"""
@@ -104,7 +119,7 @@ class StorageInfo:
 
             self._free = free
 
-        def used_percentage(self):
+        def calc_used_percentage(self):
             """Calculate total used storage percentage"""
 
             used_percentage = (self.used / self.total) * 100.0
@@ -121,26 +136,31 @@ def check_path_exists(path):
         raise RuntimeError("File path does not exist: %s" % path)
 
 
-def create_lfs_df_input_data(input_file=None):
-#TODO: """pydoc"""
+def create_lfs_df_input_data(file_system, input_file=None):
+    #TODO: """pydoc"""
+
+    input_data = None
+
     if input_file:
 
         with open(args.input_file, "r") as input_file:
             input_data = input_file.read()
 
+    else:
+        input_data = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
 
-def lustre_total_size(file_system, input_data=None):
+    return input_data
+
+
+def lustre_total_size(file_system, input_file=None):
 
     lfs_df_output = None
 
-    if not input_data:
-
-        check_path_exists(file_system)
-
-        lfs_df_output = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
+    if not input_file:
+        lfs_df_output = create_lfs_df_input_data()
 
     else:
-        lfs_df_output = input_data
+        lfs_df_output = create_lfs_df_input_data(input_file)
 
     storage_info = create_storage_info(lfs_df_output)
 
@@ -346,8 +366,8 @@ def create_storage_info(input_data):
             OST-Free: %s
             OST-Percentage: %s""",
             key, storage_dict[key].mdt.total, storage_dict[key].mdt.used,
-            storage_dict[key].mdt.free, storage_dict[key].mdt.used_percentage(),
+            storage_dict[key].mdt.free, storage_dict[key].mdt.calc_used_percentage(),
             storage_dict[key].ost.total, storage_dict[key].ost.used, storage_dict[key].ost.free,
-            storage_dict[key].ost.used_percentage())
+            storage_dict[key].ost.calc_used_percentage())
 
     return storage_dict

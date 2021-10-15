@@ -51,7 +51,7 @@ def create_weekly_reports(local_mode,
                           usage_pie_chart,
                           num_top_groups,
                           storage_multiplier,
-                          input_data=None): #TODO: change to input_file=None
+                          input_file=None):
 
     reports_path_list = list()
 
@@ -62,7 +62,7 @@ def create_weekly_reports(local_mode,
 
         group_info_list = ih.create_dummy_group_info_list()
 
-        if input_data:
+        if input_file:
             storage_total_size = ldh.lustre_total_size(file_system, input_file) * Decimal(storage_multiplier)
         else:
             storage_total_size = 18458963071860736 * Decimal(storage_multiplier)
@@ -147,7 +147,7 @@ def main():
     logging.basicConfig(
         level=logging_level, format='%(asctime)s - %(levelname)s: %(message)s')
 
-    input_data = None
+    input_file = None
 
     try:
 
@@ -188,7 +188,7 @@ def main():
                                   usage_pie_chart,
                                   num_top_groups,
                                   mul,
-                                  input_data) #TODO: change to input_file
+                                  input_file)
 
         if transfer_mode == 'on':
 
