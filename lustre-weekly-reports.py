@@ -159,6 +159,8 @@ def main():
 
         local_mode = args.enable_local
 
+        input_file = args.input_file
+
         logging.debug("Local mode enabled: %s" % local_mode)
 
         config = configparser.ConfigParser()
