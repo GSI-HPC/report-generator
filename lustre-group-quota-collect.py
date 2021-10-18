@@ -98,7 +98,7 @@ def main():
                        group_info.quota, 
                        group_info.files))
 
-        if run_mode == 'collect':
+        if args.run_mode == 'collect':
             gqc.store_group_quota(config, date_today, group_info_list)
 
         logging.info('END')
