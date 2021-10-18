@@ -44,7 +44,7 @@ def create_disk_space_usage_table(config):
             sql = """
 CREATE TABLE """ + table + """ (
    date date NOT NULL,
-   mounted_on varbinary(127) NOT NULL DEFAULT 'unknown',
+   mounted_on varchar(255) NOT NULL DEFAULT 'unknown',
    total bigint(20) unsigned DEFAULT NULL,
    free bigint(20) unsigned DEFAULT '0',
    used bigint(20) unsigned DEFAULT '0',
