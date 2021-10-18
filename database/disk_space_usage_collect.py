@@ -79,8 +79,8 @@ def store_disk_space_usage(config, date_today, storage_info_list):
 
             for item in storage_info_list:
                 sql += " ('%s', '%s', %s, %s, %s, %s)" \
-                    % (date_today, storage_info_list[item].mount_point, storage_info_list[item].ost.total,
-                       storage_info_list[item].ost.free, storage_info_list[item].ost.used, storage_info_list[item].ost.used_percentage())
+                    % (date_today, item.mount_point, item.ost.total,
+                       item.ost.free, item.ost.used, item.ost.used_percentage())
 
             logging.debug(sql)
             cur.execute(sql)

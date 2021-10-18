@@ -1,0 +1,11 @@
+[lustre]
+file_system = /lustre
+
+[mysqld]
+host = localhost
+user = lustre
+password = RW#lB(w#X)h)2=C17MW
+
+[history]
+database = report_lustre
+table = TEST

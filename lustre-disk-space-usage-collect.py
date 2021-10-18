@@ -104,7 +104,7 @@ def main():
         else:
             input_data = ldh.create_lfs_df_input_data(fs, input_file)
 
-        storage_info_list = ldh.create_storage_info(input_data)
+        storage_info_list = ldh.create_storage_info(input_data).values()
 
         if run_mode == 'print':
 
@@ -112,11 +112,11 @@ def main():
 
                 print("Date: %s - Mounted on: %s - Total: %s - Free: %s - Used: %s - Usage Percentage: %s" \
                     % (date_today,
-                      storage_info_list[item].mount_point,
-                      storage_info_list[item].ost.total,
-                      storage_info_list[item].ost.free,
-                      storage_info_list[item].ost.used,
-                      storage_info_list[item].ost.used_percentage()))
+                      item.mount_point,
+                      item.ost.total,
+                      item.ost.free,
+                      item.ost.used,
+                      item.ost.used_percentage()))
 
         if run_mode == 'collect':
             dsuc.store_disk_space_usage(config, date_today, storage_info_list)
