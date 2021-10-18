@@ -38,7 +38,7 @@ class StorageInfo:
     """Class for storing MDT and OST information"""
 
     def __init__(self, mount_point):
-        self._mount_point = mount_point
+        self.mount_point = mount_point
         self.mdt = self.StorageComponent()
         self.ost = self.StorageComponent()
 
@@ -81,38 +81,43 @@ class StorageInfo:
         def total(self, total):
             """Set total storage"""
             if not isinstance(total, int):
-                #pass
+
                 raise TypeError("Total argument must be int type")
+
+            if total < 0:
+                raise RuntimeError("Total argument cannot be negative")
 
             self._total = total
 
         @used.setter
         def used(self, used):
             """Set used storage"""
-
             if not isinstance(used, int):
                 raise TypeError("Used argument must be int type")
+
+            if used < 0:
+                raise RuntimeError("Used argument cannot be negative")
 
             self._used = used
 
         @free.setter
         def free(self, free):
             """Set free storage"""
-
             if not isinstance(free, int):
                 raise TypeError("Free argument must be int type")
+
+            if free < 0:
+                raise RuntimeError("Free argument cannot be negative")
 
             self._free = free
 
         def used_percentage(self):
-            """Calculate total used storage percentage"""
+            """Get used_percentage storage"""
 
-            used_percentage = (self.used / self.total) * 100.0
+            if (self.used / self.total) * 100.0 > 100:
+                raise RuntimeError("Percentage cannot be over 100")
 
-            if used_percentage > 100:
-                raise RuntimeError("Percentage cannot be greater than 100")
-
-            return used_percentage
+            return (self.used / self.total) * 100.0
 
 
 def check_path_exists(path):
@@ -121,18 +126,50 @@ def check_path_exists(path):
         raise RuntimeError("File path does not exist: %s" % path)
 
 
-def lustre_total_size(file_system, input_data=None):
+def create_lfs_df_input_data(file_system, input_file=None):
+    """Generates string out of `lfs df` output Either by given input-file or by executing `lfs df`.
 
-    lfs_df_output = None
+    Args:
+        file_system (str): Path of filesystem.
+        input_file (str): Path to the input file.
 
-    if not input_data:
+    Returns:
+        str: A String with the output of `lfs df`.
+
+    Raises:
+        IOError: When input file doesn't exist or is not a file.
+        RuntimeError: If path of file_system doesn't exist.
+    """
+
+
+    input_data = None
+
+    if input_file:
+
+        if not os.path.isfile(input_file):
+            raise IOError("The input file does not exist or is not a file: %s" % input_file)
+
+        with open(input_file, "r") as input_file:
+            input_data = input_file.read()
+
+    else:
 
         check_path_exists(file_system)
 
-        lfs_df_output = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
+        input_data = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
+
+    return input_data
+
+
+def lustre_total_size(file_system, input_file=None):
+
+    lfs_df_output = None
+
+    if not input_file:
+        lfs_df_output = create_lfs_df_input_data(file_system)
 
     else:
-        lfs_df_output = input_data
+        lfs_df_output = create_lfs_df_input_data(file_system, input_file)
 
     storage_info = create_storage_info(lfs_df_output)
 

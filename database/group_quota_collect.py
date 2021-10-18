@@ -45,7 +45,7 @@ def create_group_quota_history_table(config):
             sql = """
 CREATE TABLE """ + table + """ (
    date date NOT NULL,
-   gid varbinary(127) NOT NULL DEFAULT 'unknown',
+   gid varchar(127) NOT NULL DEFAULT 'unknown',
    used bigint(20) unsigned DEFAULT NULL,
    quota bigint(20) unsigned DEFAULT '0',
    files bigint(20) unsigned DEFAULT '0',
