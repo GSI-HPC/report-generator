@@ -95,7 +95,7 @@ def main():
             input_data = ldh.create_lfs_df_input_data(fs)
 
         else:
-            input_data = ldh.create_lfs_df_input_data(fs, input_file)
+            input_data = ldh.create_lfs_df_input_data(fs, args.input_file)
 
         storage_info_list = ldh.create_storage_info(input_data).values()
 

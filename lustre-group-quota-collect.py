@@ -88,7 +88,7 @@ def main():
 
         group_info_list = ldh.create_group_info_list(get_user_groups(), fs)
 
-        if run_mode == 'print':
+        if args.run_mode == 'print':
 
             for group_info in group_info_list:
 
