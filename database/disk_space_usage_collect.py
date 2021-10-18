@@ -78,14 +78,15 @@ def store_disk_space_usage(config, date_today, storage_info_list):
             #     % (date, item.name, item.size, item.quota, item.files)
 
             for item in storage_info_list:
-                sql += ", ('%s', '%s', %s, %s, %s, %s)" \
-                    % (date, item.mount_point, item.ost.total, item.ost.free, item.ost.used, item.ost.used_percentage)
+                sql += " ('%s', '%s', %s, %s, %s, %s)" \
+                    % (date_today, storage_info_list[item].mount_point, storage_info_list[item].ost.total,
+                       storage_info_list[item].ost.free, storage_info_list[item].ost.used, storage_info_list[item].ost.used_percentage())
 
             logging.debug(sql)
             cur.execute(sql)
 
             if not cur.rowcount:
-                raise RuntimeError("Snapshot failed for date: %s." % date)
+                raise RuntimeError("Snapshot failed for date: %s." % date_today)
 
             logging.debug("Inserted rows: %d into table: %s for date: %s" \
-                % (cur.rowcount, table, date))
+                % (cur.rowcount, table, date_today))

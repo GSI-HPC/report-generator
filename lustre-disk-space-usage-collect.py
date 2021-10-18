@@ -29,8 +29,6 @@ import database.disk_space_usage_collect as dsuc
 
 import dataset.lfs_dataset_handler as ldh
 
-from utils.getent_group import get_user_groups
-
 
 def main():
 
@@ -61,9 +59,9 @@ def main():
     args = parser.parse_args()
 
     if not os.path.isfile(args.config_file):
-        raise IOError("The config file does not exist or is not a file: %s" 
+        raise IOError("The config file does not exist or is not a file: %s"
             % args.config_file)
-    
+
     logging_level = logging.ERROR
 
     if args.enable_debug:
@@ -77,14 +75,12 @@ def main():
     else:
         run_mode = args.run_mode
 
-    if not os.path.isfile(args.config_file):
-        raise IOError("The config file does not exist or is not a file: %s" % args.config_file)
-
-    if not os.path.isfile(args.input_file):
+    if not args.create_table and not os.path.isfile(args.input_file):
         raise IOError("The input file does not exist or is not a file: %s" % args.input_file)
+    else:
+        input_file = args.input_file
 
     input_data = None
-    input_file = None
 
     try:
         logging.info('START')
@@ -112,15 +108,15 @@ def main():
 
         if run_mode == 'print':
 
-            pass
-            #TODO: add print mode
-            # for group_info in storage_info_list:
+            for item in storage_info_list:
 
-            #     print("Group: %s - Used: %s - Quota: %s - Files: %s" \
-            #         % (group_info.name,
-            #            group_info.size, 
-            #            group_info.quota, 
-            #            group_info.files))
+                print("Date: %s - Mounted on: %s - Total: %s - Free: %s - Used: %s - Usage Percentage: %s" \
+                    % (date_today,
+                      storage_info_list[item].mount_point,
+                      storage_info_list[item].ost.total,
+                      storage_info_list[item].ost.free,
+                      storage_info_list[item].ost.used,
+                      storage_info_list[item].ost.used_percentage()))
 
         if run_mode == 'collect':
             dsuc.store_disk_space_usage(config, date_today, storage_info_list)

@@ -38,7 +38,7 @@ class StorageInfo:
     """Class for storing MDT and OST information"""
 
     def __init__(self, mount_point):
-        self._mount_point = mount_point
+        self.mount_point = mount_point
         self.mdt = self.StorageComponent()
         self.ost = self.StorageComponent()
 
@@ -61,7 +61,6 @@ class StorageInfo:
             self.total = 0
             self.used = 0
             self.free = 0
-            self.used_percentage = 0.0
 
         @property
         def total(self):
@@ -72,11 +71,6 @@ class StorageInfo:
         def used(self):
             """Get used storage"""
             return self._used
-
-        @property
-        def used_percentage(self):
-            """Get used_percentage storage"""
-            return self._used_percentage
 
         @property
         def free(self):
@@ -101,15 +95,6 @@ class StorageInfo:
 
             self._used = used
 
-        @used_percentage.setter
-        def used_percentage(self, used_percentage):
-            """Set used storage"""
-
-            if not isinstance(used_percentage, int):
-                raise TypeError("Used_percentage argument must be int type")
-
-            self._used_percentage = calc_used_percentage()
-
         @free.setter
         def free(self, free):
             """Set free storage"""
@@ -119,15 +104,9 @@ class StorageInfo:
 
             self._free = free
 
-        def calc_used_percentage(self):
-            """Calculate total used storage percentage"""
-
-            used_percentage = (self.used / self.total) * 100.0
-
-            if used_percentage > 100:
-                raise RuntimeError("Percentage cannot be greater than 100")
-
-            return used_percentage
+        def used_percentage(self):
+            """Get used_percentage storage"""
+            return (self.used / self.total) * 100.0
 
 
 def check_path_exists(path):
@@ -137,16 +116,35 @@ def check_path_exists(path):
 
 
 def create_lfs_df_input_data(file_system, input_file=None):
-    #TODO: """pydoc"""
+    """Generates string out of `lfs df` output Either by given input-file or by executing `lfs df`.
+
+    Args:
+        file_system (str): Path of filesystem.
+        input_file (str): Path to the input file.
+
+    Returns:
+        str: A String with the output of `lfs df`.
+
+    Raises:
+        IOError: When input file doesn't exist or is not a file.
+        RuntimeError: If path of file_system doesn't exist.
+    """
+
 
     input_data = None
 
     if input_file:
 
-        with open(args.input_file, "r") as input_file:
+        if not os.path.isfile(input_file):
+            raise IOError("The input file does not exist or is not a file: %s" % input_file)
+
+        with open(input_file, "r") as input_file:
             input_data = input_file.read()
 
     else:
+
+        check_path_exists(file_system)
+
         input_data = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
 
     return input_data
@@ -366,8 +364,8 @@ def create_storage_info(input_data):
             OST-Free: %s
             OST-Percentage: %s""",
             key, storage_dict[key].mdt.total, storage_dict[key].mdt.used,
-            storage_dict[key].mdt.free, storage_dict[key].mdt.calc_used_percentage(),
+            storage_dict[key].mdt.free, storage_dict[key].mdt.used_percentage(),
             storage_dict[key].ost.total, storage_dict[key].ost.used, storage_dict[key].ost.free,
-            storage_dict[key].ost.calc_used_percentage())
+            storage_dict[key].ost.used_percentage())
 
     return storage_dict
