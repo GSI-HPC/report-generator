@@ -118,7 +118,7 @@ def main():
     if not os.path.isfile(args.config_file):
         raise IOError("The config file does not exist or is not a file: " + args.config_file)
 
-    logging_level = logging.ERROR
+    logging_level = logging.INFO
 
     if args.enable_debug:
         logging_level = logging.DEBUG

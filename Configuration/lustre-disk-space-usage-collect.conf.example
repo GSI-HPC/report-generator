@@ -8,4 +8,4 @@ password =
 
 [history]
 database = report_lustre
-table = DISK_SPACE_HISTORY
+table = DISK_SPACE_USAGE_HISTORY

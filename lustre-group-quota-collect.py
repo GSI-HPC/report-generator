@@ -26,26 +26,24 @@ import sys
 import os
 
 import database.group_quota_collect as gqc
-
 import dataset.lfs_dataset_handler as ldh
 
 from utils.getent_group import get_user_groups
 
-
 def main():
 
     # Default run-mode: collect
-    run_mode = 'collect'
+    RUN_MODE = 'collect'
 
     parser = argparse.ArgumentParser(description='')
 
     parser.add_argument('-f', '--config-file', dest='config_file', type=str,
         required=True, help='Path of the config file.')
-    
+
     parser.add_argument('-m', '--run-mode', dest='run_mode', type=str,
-        default=run_mode, required=False,
+        default=RUN_MODE, required=False,
         help="Specifies the run mode: 'print' or 'collect' - Default: %s" %
-            run_mode)
+            RUN_MODE)
 
     parser.add_argument('-D', '--enable-debug', dest='enable_debug',
         required=False, action='store_true',
@@ -61,7 +59,7 @@ def main():
         raise IOError("The config file does not exist or is not a file: %s" 
             % args.config_file)
     
-    logging_level = logging.ERROR
+    logging_level = logging.INFO
 
     if args.enable_debug:
         logging_level = logging.DEBUG
@@ -71,8 +69,6 @@ def main():
 
     if not (args.run_mode == 'print' or args.run_mode == 'collect'):
         raise RuntimeError("Invalid run mode: %s" % args.run_mode)
-    else:
-        run_mode = args.run_mode
 
     try:
         logging.info('START')
@@ -96,7 +92,7 @@ def main():
 
             for group_info in group_info_list:
 
-                print("Group: %s - Used: %s - Quota: %s - Files: %s" \
+                logging.info("Group: %s - Used: %s - Quota: %s - Files: %s" \
                     % (group_info.name,
                        group_info.size, 
                        group_info.quota, 
@@ -118,7 +114,6 @@ def main():
 
         logging.error(error_msg)
         sys.exit(1)
-
 
 if __name__ == '__main__':
     main()

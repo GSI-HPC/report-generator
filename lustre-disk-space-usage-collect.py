@@ -26,14 +26,11 @@ import sys
 import os
 
 import database.disk_space_usage_collect as dsuc
-
 import dataset.lfs_dataset_handler as ldh
-
 
 def main():
 
-    # Default run-mode: collect
-    run_mode = 'collect'
+    RUN_MODE = 'collect'
 
     parser = argparse.ArgumentParser(description='')
 
@@ -48,9 +45,9 @@ def main():
         type=str, required=False, help='Path of the input file.')
 
     parser.add_argument('-m', '--run-mode', dest='run_mode', type=str,
-        default=run_mode, required=False,
+        default=RUN_MODE, required=False,
         help="Specifies the run mode: 'print' or 'collect' - Default: %s" %
-            run_mode)
+            RUN_MODE)
 
     parser.add_argument('-D', '--enable-debug', dest='enable_debug',
         required=False, action='store_true',
@@ -62,7 +59,7 @@ def main():
         raise IOError("The config file does not exist or is not a file: %s"
             % args.config_file)
 
-    logging_level = logging.ERROR
+    logging_level = logging.INFO
 
     if args.enable_debug:
         logging_level = logging.DEBUG
@@ -72,13 +69,9 @@ def main():
 
     if not (args.run_mode == 'print' or args.run_mode == 'collect'):
         raise RuntimeError("Invalid run mode: %s" % args.run_mode)
-    else:
-        run_mode = args.run_mode
 
     if not args.create_table and not os.path.isfile(args.input_file):
         raise IOError("The input file does not exist or is not a file: %s" % args.input_file)
-    else:
-        input_file = args.input_file
 
     input_data = None
 
@@ -106,11 +99,11 @@ def main():
 
         storage_info_list = ldh.create_storage_info(input_data).values()
 
-        if run_mode == 'print':
+        if args.run_mode == 'print':
 
             for item in storage_info_list:
 
-                print("Date: %s - Mounted on: %s - Total: %s - Free: %s - Used: %s - Usage Percentage: %s" \
+                logging.info("Date: %s - Mounted on: %s - Total: %s - Free: %s - Used: %s - Usage Percentage: %s" \
                     % (date_today,
                       item.mount_point,
                       item.ost.total,
@@ -118,7 +111,7 @@ def main():
                       item.ost.used,
                       item.ost.used_percentage()))
 
-        if run_mode == 'collect':
+        if args.run_mode == 'collect':
             dsuc.store_disk_space_usage(config, date_today, storage_info_list)
 
         logging.info('END')
