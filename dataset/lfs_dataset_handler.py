@@ -80,13 +80,9 @@ class StorageInfo:
         @total.setter
         def total(self, total):
             """Set total storage"""
-
             if not isinstance(total, int):
                 #pass
                 raise TypeError("Total argument must be int type")
-
-            if total < 0:
-                raise RuntimeError("Total argument cannot be negative")
 
             self._total = total
 
@@ -97,9 +93,6 @@ class StorageInfo:
             if not isinstance(used, int):
                 raise TypeError("Used argument must be int type")
 
-            if used < 0:
-                raise RuntimeError("Used argument cannot be negative")
-
             self._used = used
 
         @free.setter
@@ -109,17 +102,10 @@ class StorageInfo:
             if not isinstance(free, int):
                 raise TypeError("Free argument must be int type")
 
-            if free < 0:
-                raise RuntimeError("Free argument cannot be negative")
-
             self._free = free
 
         def used_percentage(self):
             """Get used_percentage storage"""
-
-            if (self.used / self.total) * 100.0 > 100:
-                raise RuntimeError("Percentage cannot be over 100")
-
             return (self.used / self.total) * 100.0
 
 
@@ -169,10 +155,10 @@ def lustre_total_size(file_system, input_file=None):
     lfs_df_output = None
 
     if not input_file:
-        lfs_df_output = create_lfs_df_input_data(file_system)
+        lfs_df_output = create_lfs_df_input_data()
 
     else:
-        lfs_df_output = create_lfs_df_input_data(file_system, input_file)
+        lfs_df_output = create_lfs_df_input_data(input_file)
 
     storage_info = create_storage_info(lfs_df_output)
 
