@@ -18,6 +18,7 @@
 #
 
 
+import enum
 import logging
 import MySQLdb
 
@@ -70,17 +71,16 @@ def store_disk_space_usage(config, date_today, storage_info_list):
             sql = "INSERT INTO %s (date, mounted_on, total, free, used, used_percentage) VALUES" \
                 % table
 
-            # iter_list = iter(storage_info_list)
+            for index, item in enumerate(storage_info_list, start=1):
 
-            # item = next(iter_list)
+                sql_end = ","
 
-            # sql += "('%s', '%s', %s, %s, %s)" \
-            #     % (date, item.name, item.size, item.quota, item.files)
+                if index == len(storage_info_list):
+                    sql_end = ";"
 
-            for item in storage_info_list:
-                sql += " ('%s', '%s', %s, %s, %s, %s)" \
+                sql += " ('%s', '%s', %s, %s, %s, %s)%s" \
                     % (date_today, item.mount_point, item.ost.total,
-                       item.ost.free, item.ost.used, item.ost.used_percentage())
+                    item.ost.free, item.ost.used, item.ost.used_percentage(), sql_end)
 
             logging.debug(sql)
             cur.execute(sql)
