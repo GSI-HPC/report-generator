@@ -183,6 +183,95 @@ def lustre_total_size(file_system, input_file=None):
     return total_size
 
 
+def create_group_info_list_from_file(input_file):
+    if not os.path.isfile(input_file):
+        raise IOError("The input file does not exist or is not a file: %s" % input_file)
+
+    with open(input_file, "r") as input_file:
+        input_data = input_file.read()
+
+    if not isinstance(input_data, str):
+        raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
+
+    group_info_item_list = list()
+
+    #TODO: move regex patterns to top
+    group_header_reg_pattern = r"^Disk\s+quotas\s+for\s+grp\s+(group\d+)\s+\(gid\s+(\d+)\)"
+    group_header_reg_comp = re.compile(group_header_reg_pattern)
+    group_info_reg_pattern = r"^Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace"
+    group_info_reg_comp = re.compile(group_info_reg_pattern)
+    group_data_reg_pattern = r"^(/[\d|\w|/]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)"
+    group_data_comp = re.compile(group_data_reg_pattern)
+
+    group_header_found = False
+    group_info_found = False
+
+    current_group = None
+
+    for line in input_data.splitlines():
+
+        stripped_line = line.strip()
+
+        if not stripped_line:
+            continue
+
+        group_header_result = group_header_reg_comp.match(stripped_line)
+        group_info_result = group_info_reg_comp.match(stripped_line)
+        group_data_result = group_data_comp.match(stripped_line)
+
+        if group_header_result:
+
+            if group_header_found and not group_info_found:
+                raise RuntimeError("Group header found before group usage size")
+
+            current_group = group_header_result.group(1)
+            group_header_found = True
+
+        elif group_info_result:
+            logging.debug("Skipped line since it is quota caption: %s" % stripped_line)
+            continue
+
+        elif group_data_result:
+
+            if group_info_found and not group_header_found:
+                raise RuntimeError("Group usage size found before group header")
+
+            group_header_found = False
+            group_info_found = True
+
+            #TODO: Add enums for regex catching
+            # file_system = result.group(1)
+            kbytes_used_raw = group_data_result.group(2)
+            kbytes_quota = int(group_data_result.group(3))
+            # kbytes_limit = int(result.group(4))
+            # grace1 = int(result.group(5))
+            files = int(group_data_result.group(6))
+            # quota2 = int(result.group(7))
+            # limit2 = int(result.group(8))
+            # grace2 = int(result.group(9))
+
+            # exclude '*' in kbytes field, if quota is exceeded!
+            if kbytes_used_raw[-1] == '*':
+                kbytes_used = int(kbytes_used_raw[:-1])
+            else:
+                kbytes_used = int(kbytes_used_raw)
+
+            bytes_used = kbytes_used  * 1024
+            bytes_quota = kbytes_quota * 1024
+
+            if files > 0:
+                group_info_item_list.append(GroupInfoItem(current_group, bytes_used, bytes_quota, files))
+            else:
+                logging.debug("Skipped group since it has no files: %s" % current_group)
+
+        else:
+            logging.error("Line mismatch, skipped line: %s", stripped_line)
+
+
+    logging.debug(group_info_item_list)
+    return group_info_item_list
+
+
 def create_group_info_list(group_names, fs):
 
     check_path_exists(fs)

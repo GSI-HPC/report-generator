@@ -40,6 +40,9 @@ def main():
     parser.add_argument('-f', '--config-file', dest='config_file', type=str,
         required=True, help='Path of the config file.')
 
+    parser.add_argument('-i', '--input-file', dest='input_file', type=str,
+        required=False, help='Path of the input file.')
+
     parser.add_argument('-m', '--run-mode', dest='run_mode', type=str,
         default=RUN_MODE, required=False,
         help="Specifies the run mode: 'print' or 'collect' - Default: %s" %
@@ -58,7 +61,11 @@ def main():
     if not os.path.isfile(args.config_file):
         raise IOError("The config file does not exist or is not a file: %s" 
             % args.config_file)
-    
+
+    if not os.path.isfile(args.input_file):
+        raise IOError("The input file does not exist or is not a file: %s" 
+            % args.input_file)
+
     logging_level = logging.INFO
 
     if args.enable_debug:
@@ -74,7 +81,7 @@ def main():
         logging.info('START')
 
         date_today = time.strftime('%Y-%m-%d')
-        
+
         config = configparser.ConfigParser()
         config.read(args.config_file)
 
@@ -86,7 +93,10 @@ def main():
 
         fs = config.get('lustre', 'file_system')
 
-        group_info_list = ldh.create_group_info_list(get_user_groups(), fs)
+        if args.input_file:
+            group_info_list = ldh.create_group_info_list_from_file(args.input_file)
+        else:
+            group_info_list = ldh.create_group_info_list(get_user_groups(), fs)
 
         if args.run_mode == 'print':
 
