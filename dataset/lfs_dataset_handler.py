@@ -222,11 +222,12 @@ def create_lfs_quota_input_data(file_system, input_file=None):
 
         check_path_exists(file_system)
 
+        output_list = list()
+
         for group_name in get_user_groups():
-
-            output = subprocess.check_output(['sudo', LFS_BIN, 'quota', '-g', group_name, file_system]).decode()
-
-            input_data += output
+            output_list.append(subprocess.check_output(['sudo', LFS_BIN, 'quota', '-g', group_name, file_system]).decode())
+        
+        input_data = ''.join(output_list)
 
     return input_data
 
@@ -242,6 +243,13 @@ def lustre_total_size(file_system, input_file=None):
         lfs_df_output = create_lfs_df_input_data(file_system, input_file)
 
     storage_info = create_storage_info(lfs_df_output)
+
+    # TODO:
+    # if not input_file:
+    #     lfs_df_output = create_storage_info(file_system)
+    # else:
+    #     lfs_df_output = create_storage_info(file_system, input_file)
+
 
     if not file_system in storage_info:
         raise RuntimeError("Storage information doesn't hold file system: %s" % file_system)

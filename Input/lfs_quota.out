@@ -1,6 +1,6 @@
 Disk quotas for grp group1 (gid 1023):
     Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
-        /lustre/hebe 8183208892  107374182400 161061273600       - 2191882       0       0       -
+        /lustre 8183208892  107374182400 161061273600       - 2191882       0       0       -
 
 Disk quotas for grp group2 (gid 1082):
      Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
@@ -8,7 +8,7 @@ Disk quotas for grp group2 (gid 1082):
 
 Disk quotas for grp group3 (gid 1056):
     Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
-        /lustre/hebe 9183208892  127374182400 141061273600       - 5191882       0       0       -
+        /lustre 9183208892  127374182400 141061273600       - 5191882       0       0       -
 
 Disk quotas for grp group4 (gid 1029):
      Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace

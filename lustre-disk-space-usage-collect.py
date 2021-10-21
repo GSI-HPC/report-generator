@@ -99,6 +99,14 @@ def main():
 
         storage_info_list = ldh.create_storage_info(input_data).values()
 
+        # TODO
+        # storage_info_list = None
+
+        # if not args.input_file:
+        #     storage_info_list = ldh.create_storage_info(fs).values()
+        # else:
+        #     storage_info_list = ldh.create_storage_info(fs, args.input_file).values()
+
         if args.run_mode == 'print':
 
             for item in storage_info_list:

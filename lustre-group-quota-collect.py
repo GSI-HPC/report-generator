@@ -88,14 +88,19 @@ def main():
         fs = config.get('lustre', 'file_system')
 
         if args.input_file:
-
             input_data = ldh.create_lfs_quota_input_data(fs, args.input_file)
-
         else:
-
             input_data = ldh.create_lfs_quota_input_data(fs)
 
         group_info_list = ldh.create_group_info_list_dev(input_data)
+
+        # TODO
+        # group_info_list = None
+
+        # if args.input_file:
+        #     group_info_list = ldh.create_group_info_list(fs, input_data)
+        # else:
+        #     group_info_list = ldh.create_group_info_list(fs)
 
         if args.run_mode == 'print':
 
