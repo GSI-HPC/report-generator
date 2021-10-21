@@ -91,21 +91,12 @@ def main():
 
         fs = config.get('lustre', 'file_system')
 
-        if not args.input_file:
-            input_data = ldh.create_lfs_df_input_data(fs)
+        storage_info_list = None
 
+        if args.input_file:
+            storage_info_list = ldh.create_storage_info(fs, args.input_file).values()
         else:
-            input_data = ldh.create_lfs_df_input_data(fs, args.input_file)
-
-        storage_info_list = ldh.create_storage_info(input_data).values()
-
-        # TODO
-        # storage_info_list = None
-
-        # if not args.input_file:
-        #     storage_info_list = ldh.create_storage_info(fs).values()
-        # else:
-        #     storage_info_list = ldh.create_storage_info(fs, args.input_file).values()
+            storage_info_list = ldh.create_storage_info(fs).values()
 
         if args.run_mode == 'print':
 

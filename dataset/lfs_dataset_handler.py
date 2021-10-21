@@ -37,7 +37,7 @@ LFS_BIN = 'lfs'
 REGEX_STR_QUOTA_CAPTION = r"^\s+Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
 REGEX_PATTERN_QUOTA_CAPTION = re.compile(REGEX_STR_QUOTA_CAPTION)
 
-REGEX_QUOTA_STR_HEADER = r"^Disk\s+quotas\s+for\s+grp\s+(group\d+)\s+\(gid\s+(\d+)\):$"
+REGEX_QUOTA_STR_HEADER = r"^Disk\s+quotas\s+for\s+grp\s+(.*)\s+\(gid\s+(\d+)\):$"
 REGEX_QUOTA_STR_INFO = r"^Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
 REGEX_QUOTA_STR_DATA = r"^(/[\d|\w|/]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)$"
 REGEX_QUOTA_PATTERN_HEADER = re.compile(REGEX_QUOTA_STR_HEADER)
@@ -47,7 +47,7 @@ REGEX_QUOTA_PATTERN_DATA = re.compile(REGEX_QUOTA_STR_DATA)
 REGEX_STORAGE_STR_HEADER = r"UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*$"
 REGEX_STORAGE_STR_MDT = r"([\d|\w]+-MDT[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[MDT:[\d|\w]+\]$"
 REGEX_STORAGE_STR_OST = r"([\d|\w]+-OST[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[OST:[\d|\w]+\]$"
-REGEX_STORAGE_STR_TAIL = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w]+)$"
+REGEX_STORAGE_STR_TAIL = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)$"
 REGEX_STORAGE_PATTERN_HEADER = re.compile(REGEX_STORAGE_STR_HEADER)
 REGEX_STORAGE_PATTERN_MDT = re.compile(REGEX_STORAGE_STR_MDT)
 REGEX_STORAGE_PATTERN_OST = re.compile(REGEX_STORAGE_STR_OST)
@@ -157,58 +157,26 @@ def check_path_exists(path):
         raise RuntimeError("File path does not exist: %s" % path)
 
 
-def create_lfs_df_input_data(file_system, input_file=None):
-    """Generates string out of `lfs df` output either by given input-file or by executing `lfs df`.
-
-    Args:
-        file_system (str): Path of filesystem.
-        input_file (str): Path to the input file.
-
-    Returns:
-        str: A String with the output of `lfs df`.
-
-    Raises:
-        IOError: When input file doesn't exist or is not a file.
-        RuntimeError: If path of file_system doesn't exist.
-    """
-
-
-    input_data = None
+def lustre_total_size(file_system, input_file=None):
 
     if input_file:
-
-        if not os.path.isfile(input_file):
-            raise IOError("The input file does not exist or is not a file: %s" % input_file)
-
-        with open(input_file, "r") as input_file:
-            input_data = input_file.read()
-
+        storage_info = create_storage_info(file_system, input_file)
     else:
-
-        check_path_exists(file_system)
-
-        input_data = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
-
-    return input_data
+        storage_info = create_storage_info(file_system)
 
 
-def create_lfs_quota_input_data(file_system, input_file=None):
-    """Generates string out of `lfs quota` output either by given input-file or by executing `lfs quota`.
+    if not file_system in storage_info:
+        raise RuntimeError("Storage information doesn't hold file system: %s" % file_system)
 
-    Args:
-        file_system (str): Path of filesystem.
-        input_file (str): Path to the input file.
+    total_size = storage_info[file_system].ost.total
 
-    Returns:
-        str: A String with the output of `lfs quota`.
+    logging.debug("Lustre total size: %d" % total_size)
 
-    Raises:
-        IOError: When input file doesn't exist or is not a file.
-        RuntimeError: If path of file_system doesn't exist.
-    """
+    return total_size
 
+def create_group_info_list_dev(file_system, input_file=None):
 
-    input_data = ''
+    input_data = None
 
     if input_file:
 
@@ -226,41 +194,8 @@ def create_lfs_quota_input_data(file_system, input_file=None):
 
         for group_name in get_user_groups():
             output_list.append(subprocess.check_output(['sudo', LFS_BIN, 'quota', '-g', group_name, file_system]).decode())
-        
+
         input_data = ''.join(output_list)
-
-    return input_data
-
-
-def lustre_total_size(file_system, input_file=None):
-
-    lfs_df_output = None
-
-    if not input_file:
-        lfs_df_output = create_lfs_df_input_data(file_system)
-
-    else:
-        lfs_df_output = create_lfs_df_input_data(file_system, input_file)
-
-    storage_info = create_storage_info(lfs_df_output)
-
-    # TODO:
-    # if not input_file:
-    #     lfs_df_output = create_storage_info(file_system)
-    # else:
-    #     lfs_df_output = create_storage_info(file_system, input_file)
-
-
-    if not file_system in storage_info:
-        raise RuntimeError("Storage information doesn't hold file system: %s" % file_system)
-
-    total_size = storage_info[file_system].ost.total
-
-    logging.debug("Lustre total size: %d" % total_size)
-
-    return total_size
-
-def create_group_info_list_dev(input_data):
 
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
@@ -269,6 +204,7 @@ def create_group_info_list_dev(input_data):
 
     group_header_found = False
     group_info_found = False
+    group_data_found = False
 
     current_group = None
 
@@ -283,24 +219,31 @@ def create_group_info_list_dev(input_data):
         group_info_result = REGEX_QUOTA_PATTERN_INFO.match(stripped_line)
         group_data_result = REGEX_QUOTA_PATTERN_DATA.match(stripped_line)
 
-        if group_info_result:
-            group_info_found = True
-            continue
-
         if group_header_result:
 
-            if group_header_found and not group_info_found:
+            if group_header_found:
                 raise RuntimeError("Group header found before group usage size")
 
             current_group = group_header_result.group(1)
             group_header_found = True
+            group_data_found = False
+
+        elif group_info_result:
+
+            if group_info_found or not group_header_found:
+                raise RuntimeError("Group info found before group header")
+
+            group_info_found = True
+            continue
 
         elif group_data_result:
 
-            if group_info_found and not group_header_found:
-                raise RuntimeError("Group usage size found before group header")
+            if group_data_found or not group_info_found:
+                raise RuntimeError("Group usage size found before group info")
 
             group_header_found = False
+            group_info_found = False
+            group_data_found = True
 
             kbytes_used_raw = group_data_result.group(GroupQuotaCatching.KBYTES_USED)
             kbytes_quota = int(group_data_result.group(GroupQuotaCatching.KBYTES_QUOTA))
@@ -322,6 +265,7 @@ def create_group_info_list_dev(input_data):
 
         else:
             logging.warning("Line mismatch, skipped line: %s", stripped_line)
+            continue
 
 
     logging.debug(group_info_item_list)
@@ -412,7 +356,7 @@ def create_group_info_item(group_name, fs):
     return GroupInfoItem(group_name, bytes_used, bytes_quota, files)
 
 
-def create_storage_info(input_data):
+def create_storage_info(file_system, input_file=None):
     """Generates data structure and calculates storage information of given file systems.
 
     Args:
@@ -425,6 +369,22 @@ def create_storage_info(input_data):
         RuntimeError: If input_data is not a string and if it is corrupt e.g. header found before tail or tail found before header.
     """
     storage_dict = {}
+
+    input_data = None
+
+    if input_file:
+
+        if not os.path.isfile(input_file):
+            raise IOError("The input file does not exist or is not a file: %s" % input_file)
+
+        with open(input_file, "r") as input_file:
+            input_data = input_file.read()
+
+    else:
+
+        check_path_exists(file_system)
+
+        input_data = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
 
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
