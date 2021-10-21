@@ -28,8 +28,6 @@ import os
 import database.group_quota_collect as gqc
 import dataset.lfs_dataset_handler as ldh
 
-from utils.getent_group import get_user_groups
-
 def main():
 
     # Default run-mode: collect
@@ -62,10 +60,6 @@ def main():
         raise IOError("The config file does not exist or is not a file: %s" 
             % args.config_file)
 
-    if not os.path.isfile(args.input_file):
-        raise IOError("The input file does not exist or is not a file: %s" 
-            % args.input_file)
-
     logging_level = logging.INFO
 
     if args.enable_debug:
@@ -94,9 +88,14 @@ def main():
         fs = config.get('lustre', 'file_system')
 
         if args.input_file:
-            group_info_list = ldh.create_group_info_list_from_file(args.input_file)
+
+            input_data = ldh.create_lfs_quota_input_data(fs, args.input_file)
+
         else:
-            group_info_list = ldh.create_group_info_list(get_user_groups(), fs)
+
+            input_data = ldh.create_lfs_quota_input_data(fs)
+
+        group_info_list = ldh.create_group_info_list_dev(input_data)
 
         if args.run_mode == 'print':
 

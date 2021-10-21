@@ -24,14 +24,45 @@ import sys
 import logging
 import subprocess
 from decimal import Decimal
+from enum import IntEnum
 
 from dataset.item_handler import GroupInfoItem
+
+from utils.getent_group import get_user_groups
 
 
 LFS_BIN = 'lfs'
 
+#TODO: Remove and use the one below?
 REGEX_STR_QUOTA_CAPTION = r"^\s+Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
 REGEX_PATTERN_QUOTA_CAPTION = re.compile(REGEX_STR_QUOTA_CAPTION)
+
+REGEX_QUOTA_STR_HEADER = r"^Disk\s+quotas\s+for\s+grp\s+(group\d+)\s+\(gid\s+(\d+)\):$"
+REGEX_QUOTA_STR_INFO = r"^Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
+REGEX_QUOTA_STR_DATA = r"^(/[\d|\w|/]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)$"
+REGEX_QUOTA_PATTERN_HEADER = re.compile(REGEX_QUOTA_STR_HEADER)
+REGEX_QUOTA_PATTERN_INFO = re.compile(REGEX_QUOTA_STR_INFO)
+REGEX_QUOTA_PATTERN_DATA = re.compile(REGEX_QUOTA_STR_DATA)
+
+REGEX_STORAGE_STR_HEADER = r"UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*$"
+REGEX_STORAGE_STR_MDT = r"([\d|\w]+-MDT[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[MDT:[\d|\w]+\]$"
+REGEX_STORAGE_STR_OST = r"([\d|\w]+-OST[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[OST:[\d|\w]+\]$"
+REGEX_STORAGE_STR_TAIL = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w]+)$"
+REGEX_STORAGE_PATTERN_HEADER = re.compile(REGEX_STORAGE_STR_HEADER)
+REGEX_STORAGE_PATTERN_MDT = re.compile(REGEX_STORAGE_STR_MDT)
+REGEX_STORAGE_PATTERN_OST = re.compile(REGEX_STORAGE_STR_OST)
+REGEX_STORAGE_PATTERN_TAIL = re.compile(REGEX_STORAGE_STR_TAIL)
+
+class GroupQuotaCatching(IntEnum):
+    FILE_SYSTEM = 1
+    KBYTES_USED = 2
+    KBYTES_QUOTA = 3
+    KBYTES_LIMIT = 4
+    KBYTES_GRACE = 5
+    FILES_COUNT = 6
+    FILES_QUOTA = 7
+    FILES_LIMIT = 8
+    FILES_GRACE = 9
 
 
 class StorageInfo:
@@ -127,7 +158,7 @@ def check_path_exists(path):
 
 
 def create_lfs_df_input_data(file_system, input_file=None):
-    """Generates string out of `lfs df` output Either by given input-file or by executing `lfs df`.
+    """Generates string out of `lfs df` output either by given input-file or by executing `lfs df`.
 
     Args:
         file_system (str): Path of filesystem.
@@ -161,6 +192,45 @@ def create_lfs_df_input_data(file_system, input_file=None):
     return input_data
 
 
+def create_lfs_quota_input_data(file_system, input_file=None):
+    """Generates string out of `lfs quota` output either by given input-file or by executing `lfs quota`.
+
+    Args:
+        file_system (str): Path of filesystem.
+        input_file (str): Path to the input file.
+
+    Returns:
+        str: A String with the output of `lfs quota`.
+
+    Raises:
+        IOError: When input file doesn't exist or is not a file.
+        RuntimeError: If path of file_system doesn't exist.
+    """
+
+
+    input_data = ''
+
+    if input_file:
+
+        if not os.path.isfile(input_file):
+            raise IOError("The input file does not exist or is not a file: %s" % input_file)
+
+        with open(input_file, "r") as input_file:
+            input_data = input_file.read()
+
+    else:
+
+        check_path_exists(file_system)
+
+        for group_name in get_user_groups():
+
+            output = subprocess.check_output(['sudo', LFS_BIN, 'quota', '-g', group_name, file_system]).decode()
+
+            input_data += output
+
+    return input_data
+
+
 def lustre_total_size(file_system, input_file=None):
 
     lfs_df_output = None
@@ -182,26 +252,12 @@ def lustre_total_size(file_system, input_file=None):
 
     return total_size
 
-
-def create_group_info_list_from_file(input_file):
-    if not os.path.isfile(input_file):
-        raise IOError("The input file does not exist or is not a file: %s" % input_file)
-
-    with open(input_file, "r") as input_file:
-        input_data = input_file.read()
+def create_group_info_list_dev(input_data):
 
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
 
     group_info_item_list = list()
-
-    #TODO: move regex patterns to top
-    group_header_reg_pattern = r"^Disk\s+quotas\s+for\s+grp\s+(group\d+)\s+\(gid\s+(\d+)\)"
-    group_header_reg_comp = re.compile(group_header_reg_pattern)
-    group_info_reg_pattern = r"^Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace"
-    group_info_reg_comp = re.compile(group_info_reg_pattern)
-    group_data_reg_pattern = r"^(/[\d|\w|/]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)"
-    group_data_comp = re.compile(group_data_reg_pattern)
 
     group_header_found = False
     group_info_found = False
@@ -215,9 +271,12 @@ def create_group_info_list_from_file(input_file):
         if not stripped_line:
             continue
 
-        group_header_result = group_header_reg_comp.match(stripped_line)
-        group_info_result = group_info_reg_comp.match(stripped_line)
-        group_data_result = group_data_comp.match(stripped_line)
+        group_header_result = REGEX_QUOTA_PATTERN_HEADER.match(stripped_line)
+        group_info_result = REGEX_QUOTA_PATTERN_INFO.match(stripped_line)
+        group_data_result = REGEX_QUOTA_PATTERN_DATA.match(stripped_line)
+
+        if group_info_result:
+            continue
 
         if group_header_result:
 
@@ -227,10 +286,6 @@ def create_group_info_list_from_file(input_file):
             current_group = group_header_result.group(1)
             group_header_found = True
 
-        elif group_info_result:
-            logging.debug("Skipped line since it is quota caption: %s" % stripped_line)
-            continue
-
         elif group_data_result:
 
             if group_info_found and not group_header_found:
@@ -239,16 +294,9 @@ def create_group_info_list_from_file(input_file):
             group_header_found = False
             group_info_found = True
 
-            #TODO: Add enums for regex catching
-            # file_system = result.group(1)
-            kbytes_used_raw = group_data_result.group(2)
-            kbytes_quota = int(group_data_result.group(3))
-            # kbytes_limit = int(result.group(4))
-            # grace1 = int(result.group(5))
-            files = int(group_data_result.group(6))
-            # quota2 = int(result.group(7))
-            # limit2 = int(result.group(8))
-            # grace2 = int(result.group(9))
+            kbytes_used_raw = group_data_result.group(GroupQuotaCatching.KBYTES_USED)
+            kbytes_quota = int(group_data_result.group(GroupQuotaCatching.KBYTES_QUOTA))
+            files = int(group_data_result.group(GroupQuotaCatching.FILES_COUNT))
 
             # exclude '*' in kbytes field, if quota is exceeded!
             if kbytes_used_raw[-1] == '*':
@@ -302,7 +350,7 @@ def create_group_info_list(group_names, fs):
     return group_info_item_list
 
 
-def create_group_info_item(gid, fs):
+def create_group_info_item(group_name, fs):
 
     check_path_exists(fs)
 
@@ -312,10 +360,10 @@ def create_group_info_item(gid, fs):
     ## Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
     ## /lustre/hebe 8183208892  107374182400 161061273600       - 2191882       0       0       -
 
-    logging.debug("Querying Quota Information for Group: %s" % (gid))
+    logging.debug("Querying Quota Information for Group: %s" % (group_name))
 
     output = subprocess.check_output(\
-        ['sudo', LFS_BIN, 'quota', '-g', gid, fs]).decode()
+        ['sudo', LFS_BIN, 'quota', '-g', group_name, fs]).decode()
 
     logging.debug("Quota Information Output:\n%s" % (output))
 
@@ -353,7 +401,7 @@ def create_group_info_item(gid, fs):
 
     files = int(fields[5])
 
-    return GroupInfoItem(gid, bytes_used, bytes_quota, files)
+    return GroupInfoItem(group_name, bytes_used, bytes_quota, files)
 
 
 def create_storage_info(input_data):
@@ -373,15 +421,6 @@ def create_storage_info(input_data):
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
 
-    header_reg_pattern = r"UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*"
-    header_reg_comp = re.compile(header_reg_pattern)
-    mdt_reg_pattern = r"([\d|\w]+-MDT[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[MDT:[\d|\w]+\]"
-    mdt_reg_comp = re.compile(mdt_reg_pattern)
-    ost_reg_pattern = r"([\d|\w]+-OST[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[OST:[\d|\w]+\]"
-    ost_reg_comp = re.compile(ost_reg_pattern)
-    tail_reg_pattern = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w]+)"
-    tail_reg_comp = re.compile(tail_reg_pattern)
-
     header_found = False
     tail_found = False
     mount_point_info = None
@@ -393,10 +432,10 @@ def create_storage_info(input_data):
         if not stripped_line:
             continue
 
-        header_result = header_reg_comp.match(stripped_line)
-        mdt_result = mdt_reg_comp.match(stripped_line)
-        ost_result = ost_reg_comp.match(stripped_line)
-        tail_result = tail_reg_comp.match(stripped_line)
+        header_result = REGEX_STORAGE_PATTERN_HEADER.match(stripped_line)
+        mdt_result = REGEX_STORAGE_PATTERN_MDT.match(stripped_line)
+        ost_result = REGEX_STORAGE_PATTERN_OST.match(stripped_line)
+        tail_result = REGEX_STORAGE_PATTERN_TAIL.match(stripped_line)
 
         if header_result:
 
