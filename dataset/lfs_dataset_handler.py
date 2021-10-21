@@ -284,6 +284,7 @@ def create_group_info_list_dev(input_data):
         group_data_result = REGEX_QUOTA_PATTERN_DATA.match(stripped_line)
 
         if group_info_result:
+            group_info_found = True
             continue
 
         if group_header_result:
@@ -300,7 +301,6 @@ def create_group_info_list_dev(input_data):
                 raise RuntimeError("Group usage size found before group header")
 
             group_header_found = False
-            group_info_found = True
 
             kbytes_used_raw = group_data_result.group(GroupQuotaCatching.KBYTES_USED)
             kbytes_quota = int(group_data_result.group(GroupQuotaCatching.KBYTES_QUOTA))
@@ -318,10 +318,10 @@ def create_group_info_list_dev(input_data):
             if files > 0:
                 group_info_item_list.append(GroupInfoItem(current_group, bytes_used, bytes_quota, files))
             else:
-                logging.debug("Skipped group since it has no files: %s" % current_group)
+                logging.warning("Skipped group since it has no files: %s" % current_group)
 
         else:
-            logging.error("Line mismatch, skipped line: %s", stripped_line)
+            logging.warning("Line mismatch, skipped line: %s", stripped_line)
 
 
     logging.debug(group_info_item_list)
@@ -343,7 +343,7 @@ def create_group_info_list(group_names, fs):
             if group_info.files > 0:
                 group_info_item_list.append(group_info)
             else:
-                logging.debug("Skipped group since it has no files: %s" % group_info.name)
+                logging.warning("Skipped group since it has no files: %s" % group_info.name)
 
         except Exception as e:
 
