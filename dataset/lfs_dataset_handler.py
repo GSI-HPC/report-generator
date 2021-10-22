@@ -33,10 +33,6 @@ from utils.getent_group import get_user_groups
 
 LFS_BIN = 'lfs'
 
-#TODO: Remove and use the one below?
-REGEX_STR_QUOTA_CAPTION = r"^\s+Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
-REGEX_PATTERN_QUOTA_CAPTION = re.compile(REGEX_STR_QUOTA_CAPTION)
-
 REGEX_QUOTA_STR_HEADER = r"^Disk\s+quotas\s+for\s+grp\s+(.*)\s+\(gid\s+(\d+)\):$"
 REGEX_QUOTA_STR_INFO = r"^Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
 REGEX_QUOTA_STR_DATA = r"^(/[\d|\w|/]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)$"
@@ -174,7 +170,7 @@ def lustre_total_size(file_system, input_file=None):
 
     return total_size
 
-def create_group_info_list_dev(file_system, input_file=None):
+def create_group_info_list(file_system, input_file=None):
 
     input_data = None
 
@@ -270,91 +266,6 @@ def create_group_info_list_dev(file_system, input_file=None):
 
     logging.debug(group_info_item_list)
     return group_info_item_list
-
-
-def create_group_info_list(group_names, fs):
-
-    check_path_exists(fs)
-
-    group_info_item_list = list()
-
-    for grp_name in group_names:
-
-        try:
-
-            group_info = create_group_info_item(grp_name, fs)
-
-            if group_info.files > 0:
-                group_info_item_list.append(group_info)
-            else:
-                logging.warning("Skipped group since it has no files: %s" % group_info.name)
-
-        except Exception as e:
-
-            logging.error("Skipped creation of GroupInfoItem for group: %s" % grp_name)
-
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-
-            logging.error("Caught exception (%s):\n%s\n%s (line: %s)" %
-                (exc_type, str(e), filename, exc_tb.tb_lineno))
-
-    return group_info_item_list
-
-
-def create_group_info_item(group_name, fs):
-
-    check_path_exists(fs)
-
-    # Example output of 'lfs quota -g rz /lustre':
-    #
-    ## Disk quotas for grp rz (gid 1002):
-    ## Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
-    ## /lustre/hebe 8183208892  107374182400 161061273600       - 2191882       0       0       -
-
-    logging.debug("Querying Quota Information for Group: %s" % (group_name))
-
-    output = subprocess.check_output(\
-        ['sudo', LFS_BIN, 'quota', '-g', group_name, fs]).decode()
-
-    logging.debug("Quota Information Output:\n%s" % (output))
-
-    lines = output.rstrip().split('\n')
-
-    if len(lines) < 3:
-        raise RuntimeError("'lfs quota' output is to short:\n%s" % output)
-
-    # Check caption line of 'lfs quota' fits the expected line:
-    caption_line = lines[1]
-    match = REGEX_PATTERN_QUOTA_CAPTION.fullmatch(caption_line)
-
-    if not match:
-        raise RuntimeError(
-            f"lfs quota caption line: '{caption_line}' did not match the regex: '{REGEX_STR_QUOTA_CAPTION}'")
-
-    fields_line = lines[2].strip()
-
-    # Replace multiple whitespaces with one to split the fields on whitespace.
-    fields = re.sub(r'\s+', ' ', fields_line).split(' ')
-
-    kbytes_field = fields[1]
-    kbytes_used = None
-
-    # exclude '*' in kbytes field, if quota is exceeded!
-    if kbytes_field[-1] == '*':
-        kbytes_used = int(kbytes_field[:-1])
-    else:
-        kbytes_used = int(kbytes_field)
-
-    bytes_used = kbytes_used * 1024
-
-    kbytes_quota = int(fields[2])
-    bytes_quota = kbytes_quota * 1024
-
-    files = int(fields[5])
-
-    return GroupInfoItem(group_name, bytes_used, bytes_quota, files)
-
 
 def create_storage_info(file_system, input_file=None):
     """Generates data structure and calculates storage information of given file systems.

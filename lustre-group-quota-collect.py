@@ -57,7 +57,7 @@ def main():
     args = parser.parse_args()
 
     if not os.path.isfile(args.config_file):
-        raise IOError("The config file does not exist or is not a file: %s" 
+        raise IOError("The config file does not exist or is not a file: %s"
             % args.config_file)
 
     logging_level = logging.INFO
@@ -90,9 +90,9 @@ def main():
         group_info_list = None
 
         if args.input_file:
-            group_info_list = ldh.create_group_info_list_dev(fs, args.input_file)
+            group_info_list = ldh.create_group_info_list(fs, args.input_file)
         else:
-            group_info_list = ldh.create_group_info_list_dev(fs)
+            group_info_list = ldh.create_group_info_list(fs)
 
         if args.run_mode == 'print':
 
@@ -100,8 +100,8 @@ def main():
 
                 logging.info("Group: %s - Used: %s - Quota: %s - Files: %s" \
                     % (group_info.name,
-                       group_info.size, 
-                       group_info.quota, 
+                       group_info.size,
+                       group_info.quota,
                        group_info.files))
 
         if args.run_mode == 'collect':
