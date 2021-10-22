@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2019 Gabriele Iannetti <g.iannetti@gsi.de>
+# Copyright 2021 Gabriele Iannetti <g.iannetti@gsi.de>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,19 +20,43 @@
 
 import re
 import os
-import sys
 import logging
 import subprocess
-from decimal import Decimal
+from enum import IntEnum
 
 from dataset.item_handler import GroupInfoItem
-
+from utils.getent_group import get_user_groups
 
 LFS_BIN = 'lfs'
 
-REGEX_STR_QUOTA_CAPTION = r"^\s+Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
-REGEX_PATTERN_QUOTA_CAPTION = re.compile(REGEX_STR_QUOTA_CAPTION)
+REGEX_QUOTA_STR_BLOCK = r"(?:(?:Disk quotas for grp .*?$).*?(?:(?:[\d\w\/]+){1}(?:(?:\s+[\d\*]+){3}\s+(?:[\d\w|-]+){1}){2}))"
+REGEX_QUOTA_STR_HEADER = r"^Disk\s+quotas\s+for\s+grp\s+([\d\w\-_]+)\s+\(gid\s+\d+\):$"
+REGEX_QUOTA_STR_INFO = r"^\s*Filesystem(:?\s+[kbytes|files]+\s+quota\s+limit\s+grace){2}$"
+REGEX_QUOTA_STR_DATA = r"^\s*([\d\w\-/]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\w|-]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\w|-]+)$"
+REGEX_QUOTA_PATTERN_BLOCK = re.compile(REGEX_QUOTA_STR_BLOCK, re.MULTILINE|re.DOTALL)
+REGEX_QUOTA_PATTERN_HEADER = re.compile(REGEX_QUOTA_STR_HEADER)
+REGEX_QUOTA_PATTERN_INFO = re.compile(REGEX_QUOTA_STR_INFO)
+REGEX_QUOTA_PATTERN_DATA = re.compile(REGEX_QUOTA_STR_DATA)
 
+REGEX_STORAGE_STR_HEADER = r"UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*$"
+REGEX_STORAGE_STR_MDT = r"([\d|\w]+-MDT[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[MDT:[\d|\w]+\]$"
+REGEX_STORAGE_STR_OST = r"([\d|\w]+-OST[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[OST:[\d|\w]+\]$"
+REGEX_STORAGE_STR_TAIL = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)$"
+REGEX_STORAGE_PATTERN_HEADER = re.compile(REGEX_STORAGE_STR_HEADER)
+REGEX_STORAGE_PATTERN_MDT = re.compile(REGEX_STORAGE_STR_MDT)
+REGEX_STORAGE_PATTERN_OST = re.compile(REGEX_STORAGE_STR_OST)
+REGEX_STORAGE_PATTERN_TAIL = re.compile(REGEX_STORAGE_STR_TAIL)
+
+class GroupQuotaCatching(IntEnum):
+    FILE_SYSTEM = 1
+    KBYTES_USED = 2
+    KBYTES_QUOTA = 3
+    KBYTES_LIMIT = 4
+    KBYTES_GRACE = 5
+    FILES_COUNT = 6
+    FILES_QUOTA = 7
+    FILES_LIMIT = 8
+    FILES_GRACE = 9
 
 class StorageInfo:
     """Class for storing MDT and OST information"""
@@ -119,28 +143,102 @@ class StorageInfo:
 
             return (self.used / self.total) * 100.0
 
-
 def check_path_exists(path):
 
     if not os.path.exists(path):
         raise RuntimeError("File path does not exist: %s" % path)
 
+def lustre_total_size(file_system, input_file=None):
 
-def create_lfs_df_input_data(file_system, input_file=None):
-    """Generates string out of `lfs df` output Either by given input-file or by executing `lfs df`.
+    if input_file:
+        storage_info = create_storage_info(file_system, input_file)
+    else:
+        storage_info = create_storage_info(file_system)
+
+
+    if not file_system in storage_info:
+        raise RuntimeError("Storage information doesn't hold file system: %s" % file_system)
+
+    total_size = storage_info[file_system].ost.total
+
+    logging.debug("Lustre total size: %d" % total_size)
+
+    return total_size
+
+def create_group_info_list(file_system, input_file=None):
+
+    input_data = None
+    group_info_item_list = list()
+
+    if input_file:
+
+        if not os.path.isfile(input_file):
+            raise IOError("The input file does not exist or is not a file: %s" % input_file)
+
+        with open(input_file, "r") as input_file:
+            input_data = input_file.read()
+
+    else:
+
+        check_path_exists(file_system)
+
+        output_list = list()
+
+        for group_name in get_user_groups():
+            output_list.append(subprocess.check_output(['sudo', LFS_BIN, 'quota', '-g', group_name, file_system]).decode())
+
+        input_data = ''.join(output_list)
+
+    if not isinstance(input_data, str):
+        raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
+
+
+    blocks = REGEX_QUOTA_PATTERN_BLOCK.findall(input_data)
+
+    for block in blocks:
+
+        lines = block.splitlines()
+
+        if len(lines) != 3:
+            raise RuntimeError("Invalid size for Block : %s" % block)
+
+        if not REGEX_QUOTA_PATTERN_INFO.match(lines[1]):
+            raise RuntimeError("Missing info line in block: %s" % block)
+
+        group_name = REGEX_QUOTA_PATTERN_HEADER.match(lines[0]).group(1)
+
+        data_result = REGEX_QUOTA_PATTERN_DATA.match(lines[2])
+        kbytes_used_raw = data_result.group(GroupQuotaCatching.KBYTES_USED)
+        kbytes_quota = int(data_result.group(GroupQuotaCatching.KBYTES_QUOTA))
+        files = int(data_result.group(GroupQuotaCatching.FILES_COUNT))
+
+        # exclude '*' in kbytes field, if quota is exceeded!
+        if kbytes_used_raw[-1] == '*':
+            kbytes_used = int(kbytes_used_raw[:-1])
+        else:
+            kbytes_used = int(kbytes_used_raw)
+
+        bytes_used = kbytes_used * 1024
+        bytes_quota = kbytes_quota * 1024
+
+        group_info_item_list.append(GroupInfoItem(group_name, bytes_used, bytes_quota, files))
+
+    logging.debug(group_info_item_list)
+    return group_info_item_list
+
+def create_storage_info(file_system, input_file=None):
+    """Generates data structure and calculates storage information of given file systems.
 
     Args:
-        file_system (str): Path of filesystem.
-        input_file (str): Path to the input file.
+        input_data (str): Output of `lfs df` command.
 
     Returns:
-        str: A String with the output of `lfs df`.
+        dict: A Dictionary containing OST and MDT space usage information in bytes stored in a StorageInfo object.
 
     Raises:
-        IOError: When input file doesn't exist or is not a file.
-        RuntimeError: If path of file_system doesn't exist.
+        RuntimeError: If input_data is not a string and if it is corrupt e.g. header found before tail or tail found before header.
     """
-
+    storage_dict = {}
 
     input_data = None
 
@@ -158,140 +256,8 @@ def create_lfs_df_input_data(file_system, input_file=None):
 
         input_data = subprocess.check_output([LFS_BIN, "df", file_system]).decode()
 
-    return input_data
-
-
-def lustre_total_size(file_system, input_file=None):
-
-    lfs_df_output = None
-
-    if not input_file:
-        lfs_df_output = create_lfs_df_input_data(file_system)
-
-    else:
-        lfs_df_output = create_lfs_df_input_data(file_system, input_file)
-
-    storage_info = create_storage_info(lfs_df_output)
-
-    if not file_system in storage_info:
-        raise RuntimeError("Storage information doesn't hold file system: %s" % file_system)
-
-    total_size = storage_info[file_system].ost.total
-
-    logging.debug("Lustre total size: %d" % total_size)
-
-    return total_size
-
-
-def create_group_info_list(group_names, fs):
-
-    check_path_exists(fs)
-
-    group_info_item_list = list()
-
-    for grp_name in group_names:
-
-        try:
-
-            group_info = create_group_info_item(grp_name, fs)
-
-            if group_info.files > 0:
-                group_info_item_list.append(group_info)
-            else:
-                logging.debug("Skipped group since it has no files: %s" % group_info.name)
-
-        except Exception as e:
-
-            logging.error("Skipped creation of GroupInfoItem for group: %s" % grp_name)
-
-            exc_type, exc_obj, exc_tb = sys.exc_info()
-            filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-
-            logging.error("Caught exception (%s):\n%s\n%s (line: %s)" %
-                (exc_type, str(e), filename, exc_tb.tb_lineno))
-
-    return group_info_item_list
-
-
-def create_group_info_item(gid, fs):
-
-    check_path_exists(fs)
-
-    # Example output of 'lfs quota -g rz /lustre':
-    #
-    ## Disk quotas for grp rz (gid 1002):
-    ## Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
-    ## /lustre/hebe 8183208892  107374182400 161061273600       - 2191882       0       0       -
-
-    logging.debug("Querying Quota Information for Group: %s" % (gid))
-
-    output = subprocess.check_output(\
-        ['sudo', LFS_BIN, 'quota', '-g', gid, fs]).decode()
-
-    logging.debug("Quota Information Output:\n%s" % (output))
-
-    lines = output.rstrip().split('\n')
-
-    if len(lines) < 3:
-        raise RuntimeError("'lfs quota' output is to short:\n%s" % output)
-
-    # Check caption line of 'lfs quota' fits the expected line:
-    caption_line = lines[1]
-    match = REGEX_PATTERN_QUOTA_CAPTION.fullmatch(caption_line)
-
-    if not match:
-        raise RuntimeError(
-            f"lfs quota caption line: '{caption_line}' did not match the regex: '{REGEX_STR_QUOTA_CAPTION}'")
-
-    fields_line = lines[2].strip()
-
-    # Replace multiple whitespaces with one to split the fields on whitespace.
-    fields = re.sub(r'\s+', ' ', fields_line).split(' ')
-
-    kbytes_field = fields[1]
-    kbytes_used = None
-
-    # exclude '*' in kbytes field, if quota is exceeded!
-    if kbytes_field[-1] == '*':
-        kbytes_used = int(kbytes_field[:-1])
-    else:
-        kbytes_used = int(kbytes_field)
-
-    bytes_used = kbytes_used * 1024
-
-    kbytes_quota = int(fields[2])
-    bytes_quota = kbytes_quota * 1024
-
-    files = int(fields[5])
-
-    return GroupInfoItem(gid, bytes_used, bytes_quota, files)
-
-
-def create_storage_info(input_data):
-    """Generates data structure and calculates storage information of given file systems.
-
-    Args:
-        input_data (str): Output of `lfs df` command.
-
-    Returns:
-        dict: A Dictionary containing OST and MDT space usage information in bytes stored in a StorageInfo object.
-
-    Raises:
-        RuntimeError: If input_data is not a string and if it is corrupt e.g. header found before tail or tail found before header.
-    """
-    storage_dict = {}
-
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
-
-    header_reg_pattern = r"UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*"
-    header_reg_comp = re.compile(header_reg_pattern)
-    mdt_reg_pattern = r"([\d|\w]+-MDT[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[MDT:[\d|\w]+\]"
-    mdt_reg_comp = re.compile(mdt_reg_pattern)
-    ost_reg_pattern = r"([\d|\w]+-OST[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[OST:[\d|\w]+\]"
-    ost_reg_comp = re.compile(ost_reg_pattern)
-    tail_reg_pattern = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w]+)"
-    tail_reg_comp = re.compile(tail_reg_pattern)
 
     header_found = False
     tail_found = False
@@ -304,10 +270,10 @@ def create_storage_info(input_data):
         if not stripped_line:
             continue
 
-        header_result = header_reg_comp.match(stripped_line)
-        mdt_result = mdt_reg_comp.match(stripped_line)
-        ost_result = ost_reg_comp.match(stripped_line)
-        tail_result = tail_reg_comp.match(stripped_line)
+        header_result = REGEX_STORAGE_PATTERN_HEADER.match(stripped_line)
+        mdt_result = REGEX_STORAGE_PATTERN_MDT.match(stripped_line)
+        ost_result = REGEX_STORAGE_PATTERN_OST.match(stripped_line)
+        tail_result = REGEX_STORAGE_PATTERN_TAIL.match(stripped_line)
 
         if header_result:
 
