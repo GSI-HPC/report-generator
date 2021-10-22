@@ -67,5 +67,4 @@ __Python__:
 __mysqlclient:__  
 
 * gcc
-* MariaDB-devel
-* MariaDB-shared
+* libmariadbclient-dev
