@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
-# Copyright 2019 Gabriele Iannetti <g.iannetti@gsi.de>
+# Copyright 2021 Gabriele Iannetti <g.iannetti@gsi.de>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,22 +20,20 @@
 
 import re
 import os
-import sys
 import logging
 import subprocess
-from decimal import Decimal
 from enum import IntEnum
 
 from dataset.item_handler import GroupInfoItem
-
 from utils.getent_group import get_user_groups
-
 
 LFS_BIN = 'lfs'
 
-REGEX_QUOTA_STR_HEADER = r"^Disk\s+quotas\s+for\s+grp\s+(.*)\s+\(gid\s+(\d+)\):$"
-REGEX_QUOTA_STR_INFO = r"^Filesystem\s+kbytes\s+quota\s+limit\s+grace\s+files\s+quota\s+limit\s+grace$"
-REGEX_QUOTA_STR_DATA = r"^(/[\d|\w|/]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d+|\*]+)\s+([\d|\w|-]+)$"
+REGEX_QUOTA_STR_BLOCK = r"(?:(?:Disk quotas for grp .*?$).*?(?:(?:[\d\w\/]+){1}(?:(?:\s+[\d\*]+){3}\s+(?:[\d\w|-]+){1}){2}))"
+REGEX_QUOTA_STR_HEADER = r"^Disk\s+quotas\s+for\s+grp\s+([\d\w\-_]+)\s+\(gid\s+\d+\):$"
+REGEX_QUOTA_STR_INFO = r"^\s*Filesystem(:?\s+[kbytes|files]+\s+quota\s+limit\s+grace){2}$"
+REGEX_QUOTA_STR_DATA = r"^\s*([\d\w\-/]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\w|-]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\*]+)\s+([\d\w|-]+)$"
+REGEX_QUOTA_PATTERN_BLOCK = re.compile(REGEX_QUOTA_STR_BLOCK, re.MULTILINE|re.DOTALL)
 REGEX_QUOTA_PATTERN_HEADER = re.compile(REGEX_QUOTA_STR_HEADER)
 REGEX_QUOTA_PATTERN_INFO = re.compile(REGEX_QUOTA_STR_INFO)
 REGEX_QUOTA_PATTERN_DATA = re.compile(REGEX_QUOTA_STR_DATA)
@@ -59,7 +57,6 @@ class GroupQuotaCatching(IntEnum):
     FILES_QUOTA = 7
     FILES_LIMIT = 8
     FILES_GRACE = 9
-
 
 class StorageInfo:
     """Class for storing MDT and OST information"""
@@ -146,12 +143,10 @@ class StorageInfo:
 
             return (self.used / self.total) * 100.0
 
-
 def check_path_exists(path):
 
     if not os.path.exists(path):
         raise RuntimeError("File path does not exist: %s" % path)
-
 
 def lustre_total_size(file_system, input_file=None):
 
@@ -173,6 +168,7 @@ def lustre_total_size(file_system, input_file=None):
 def create_group_info_list(file_system, input_file=None):
 
     input_data = None
+    group_info_item_list = list()
 
     if input_file:
 
@@ -196,73 +192,36 @@ def create_group_info_list(file_system, input_file=None):
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
 
-    group_info_item_list = list()
 
-    group_header_found = False
-    group_info_found = False
-    group_data_found = False
+    blocks = REGEX_QUOTA_PATTERN_BLOCK.findall(input_data)
 
-    current_group = None
+    for block in blocks:
 
-    for line in input_data.splitlines():
+        lines = block.splitlines()
 
-        stripped_line = line.strip()
+        if len(lines) != 3:
+            raise RuntimeError("Invalid size for Block : %s" % block)
 
-        if not stripped_line:
-            continue
+        if not REGEX_QUOTA_PATTERN_INFO.match(lines[1]):
+            raise RuntimeError("Missing info line in block: %s" % block)
 
-        group_header_result = REGEX_QUOTA_PATTERN_HEADER.match(stripped_line)
-        group_info_result = REGEX_QUOTA_PATTERN_INFO.match(stripped_line)
-        group_data_result = REGEX_QUOTA_PATTERN_DATA.match(stripped_line)
+        group_name = REGEX_QUOTA_PATTERN_HEADER.match(lines[0]).group(1)
 
-        if group_header_result:
+        data_result = REGEX_QUOTA_PATTERN_DATA.match(lines[2])
+        kbytes_used_raw = data_result.group(GroupQuotaCatching.KBYTES_USED)
+        kbytes_quota = int(data_result.group(GroupQuotaCatching.KBYTES_QUOTA))
+        files = int(data_result.group(GroupQuotaCatching.FILES_COUNT))
 
-            if group_header_found:
-                raise RuntimeError("Group header found before group info")
-
-            current_group = group_header_result.group(1)
-            group_header_found = True
-            group_data_found = False
-
-        elif group_info_result:
-
-            if group_info_found or not group_header_found:
-                raise RuntimeError("Group info found before group header")
-
-            group_info_found = True
-            continue
-
-        elif group_data_result:
-
-            if group_data_found or not group_info_found:
-                raise RuntimeError("Group usage size found before group info")
-
-            group_header_found = False
-            group_info_found = False
-            group_data_found = True
-
-            kbytes_used_raw = group_data_result.group(GroupQuotaCatching.KBYTES_USED)
-            kbytes_quota = int(group_data_result.group(GroupQuotaCatching.KBYTES_QUOTA))
-            files = int(group_data_result.group(GroupQuotaCatching.FILES_COUNT))
-
-            # exclude '*' in kbytes field, if quota is exceeded!
-            if kbytes_used_raw[-1] == '*':
-                kbytes_used = int(kbytes_used_raw[:-1])
-            else:
-                kbytes_used = int(kbytes_used_raw)
-
-            bytes_used = kbytes_used  * 1024
-            bytes_quota = kbytes_quota * 1024
-
-            if files > 0:
-                group_info_item_list.append(GroupInfoItem(current_group, bytes_used, bytes_quota, files))
-            else:
-                logging.warning("Skipped group since it has no files: %s" % current_group)
-
+        # exclude '*' in kbytes field, if quota is exceeded!
+        if kbytes_used_raw[-1] == '*':
+            kbytes_used = int(kbytes_used_raw[:-1])
         else:
-            logging.warning("Line mismatch, skipped line: %s", stripped_line)
-            continue
+            kbytes_used = int(kbytes_used_raw)
 
+        bytes_used = kbytes_used * 1024
+        bytes_quota = kbytes_quota * 1024
+
+        group_info_item_list.append(GroupInfoItem(group_name, bytes_used, bytes_quota, files))
 
     logging.debug(group_info_item_list)
     return group_info_item_list
