@@ -222,7 +222,7 @@ def create_group_info_list_dev(file_system, input_file=None):
         if group_header_result:
 
             if group_header_found:
-                raise RuntimeError("Group header found before group usage size")
+                raise RuntimeError("Group header found before group info")
 
             current_group = group_header_result.group(1)
             group_header_found = True
