@@ -38,16 +38,16 @@ REGEX_QUOTA_PATTERN_HEADER = re.compile(REGEX_QUOTA_STR_HEADER)
 REGEX_QUOTA_PATTERN_INFO = re.compile(REGEX_QUOTA_STR_INFO)
 REGEX_QUOTA_PATTERN_DATA = re.compile(REGEX_QUOTA_STR_DATA)
 
+REGEX_STORAGE_STR_BLOCK = r"(?:(?:UUID\s+1K-blocks\s+Used.*?$).*?(?:filesystem_summary:(?:\s+[\d]+){3}\s+\d+%\s+[\w\d\/]+))"
 REGEX_STORAGE_STR_HEADER = r"UUID\s+1K-blocks\s+Used\s+Available\s+Use%\s+Mounted on\s*$"
-REGEX_STORAGE_STR_MDT = r"([\d|\w]+-MDT[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[MDT:[\d|\w]+\]$"
-REGEX_STORAGE_STR_OST = r"([\d|\w]+-OST[\d|\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)\[OST:[\d|\w]+\]$"
-REGEX_STORAGE_STR_TAIL = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+(/[\d|\w|/]+)$"
+REGEX_STORAGE_STR_DATA = r"(?:[\d\w]+-([OST|MDT]+)[\d\w]+_UUID)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+([\d\w\/]+)\[([OST|MDT]+):[\d\w]+\]"
+REGEX_STORAGE_STR_TAIL = r"filesystem_summary:\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)%\s+([\d\w\/]+)$"
+REGEX_STORAGE_PATTERN_BLOCK = re.compile(REGEX_STORAGE_STR_BLOCK, re.MULTILINE|re.DOTALL)
 REGEX_STORAGE_PATTERN_HEADER = re.compile(REGEX_STORAGE_STR_HEADER)
-REGEX_STORAGE_PATTERN_MDT = re.compile(REGEX_STORAGE_STR_MDT)
-REGEX_STORAGE_PATTERN_OST = re.compile(REGEX_STORAGE_STR_OST)
+REGEX_STORAGE_PATTERN_DATA = re.compile(REGEX_STORAGE_STR_DATA)
 REGEX_STORAGE_PATTERN_TAIL = re.compile(REGEX_STORAGE_STR_TAIL)
 
-class GroupQuotaCatching(IntEnum):
+class GroupQuotaCapturing(IntEnum):
     FILE_SYSTEM = 1
     KBYTES_USED = 2
     KBYTES_QUOTA = 3
@@ -57,6 +57,16 @@ class GroupQuotaCatching(IntEnum):
     FILES_QUOTA = 7
     FILES_LIMIT = 8
     FILES_GRACE = 9
+
+class StorageUsageCapturing(IntEnum):
+    TARGET = 1
+    KBYTES_TOTAL = 2
+    KBYTES_USED = 3
+    KBYTES_FREE = 4
+    KBYTES_USED_PERCENTAGE = 5
+    MOUNTPOINT = 6
+    TARGET_END = 7
+
 
 class StorageInfo:
     """Class for storing MDT and OST information"""
@@ -208,9 +218,9 @@ def create_group_info_list(file_system, input_file=None):
         group_name = REGEX_QUOTA_PATTERN_HEADER.match(lines[0]).group(1)
 
         data_result = REGEX_QUOTA_PATTERN_DATA.match(lines[2])
-        kbytes_used_raw = data_result.group(GroupQuotaCatching.KBYTES_USED)
-        kbytes_quota = int(data_result.group(GroupQuotaCatching.KBYTES_QUOTA))
-        files = int(data_result.group(GroupQuotaCatching.FILES_COUNT))
+        kbytes_used_raw = data_result.group(GroupQuotaCapturing.KBYTES_USED)
+        kbytes_quota = int(data_result.group(GroupQuotaCapturing.KBYTES_QUOTA))
+        files = int(data_result.group(GroupQuotaCapturing.FILES_COUNT))
 
         # exclude '*' in kbytes field, if quota is exceeded!
         if kbytes_used_raw[-1] == '*':
@@ -259,73 +269,40 @@ def create_storage_info(file_system, input_file=None):
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
 
-    header_found = False
-    tail_found = False
-    mount_point_info = None
+    blocks = REGEX_STORAGE_PATTERN_BLOCK.findall(input_data)
 
-    for line in input_data.splitlines():
+    for block in blocks:
 
-        stripped_line = line.strip()
+        mount_point_info = None
 
-        if not stripped_line:
-            continue
+        for line in block.splitlines():
 
-        header_result = REGEX_STORAGE_PATTERN_HEADER.match(stripped_line)
-        mdt_result = REGEX_STORAGE_PATTERN_MDT.match(stripped_line)
-        ost_result = REGEX_STORAGE_PATTERN_OST.match(stripped_line)
-        tail_result = REGEX_STORAGE_PATTERN_TAIL.match(stripped_line)
+            if not line:
+                continue
 
-        if header_result:
+            result = REGEX_STORAGE_PATTERN_DATA.match(line)
 
-            if header_found:
-                raise RuntimeError("Header found before tail")
+            if result:
 
-            header_found = True
-            tail_found = False
+                if not mount_point_info:
 
-        elif mdt_result:
+                    mount_point_info = result.group(StorageUsageCapturing.MOUNTPOINT)
+                    storage_dict[mount_point_info] = StorageInfo(mount_point_info)
 
-            if not mount_point_info:
+                if result.group(StorageUsageCapturing.TARGET) == "MDT":
 
-                mount_point_info = mdt_result.group(6)
-                storage_dict[mount_point_info] = StorageInfo(mount_point_info)
-                storage_dict[mount_point_info].mdt.total += int(mdt_result.group(2)) * 1024
-                storage_dict[mount_point_info].mdt.used += int(mdt_result.group(3)) * 1024
-                storage_dict[mount_point_info].mdt.free += int(mdt_result.group(4)) * 1024
+                    storage_dict[mount_point_info].mdt.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
+                    storage_dict[mount_point_info].mdt.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
+                    storage_dict[mount_point_info].mdt.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
 
-            else:
+                elif result.group(StorageUsageCapturing.TARGET) == "OST":
 
-                storage_dict[mount_point_info].mdt.total += int(mdt_result.group(2)) * 1024
-                storage_dict[mount_point_info].mdt.used += int(mdt_result.group(3)) * 1024
-                storage_dict[mount_point_info].mdt.free += int(mdt_result.group(4)) * 1024
+                    storage_dict[mount_point_info].ost.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
+                    storage_dict[mount_point_info].ost.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
+                    storage_dict[mount_point_info].ost.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
 
-        elif ost_result:
-
-            if not mount_point_info:
-
-                mount_point_info = ost_result.group(6)
-                storage_dict[mount_point_info] = StorageInfo(mount_point_info)
-                storage_dict[mount_point_info].ost.total += int(ost_result.group(2)) * 1024
-                storage_dict[mount_point_info].ost.used += int(ost_result.group(3)) * 1024
-                storage_dict[mount_point_info].ost.free += int(ost_result.group(4)) * 1024
-
-            else:
-
-                storage_dict[mount_point_info].ost.total += int(ost_result.group(2)) * 1024
-                storage_dict[mount_point_info].ost.used += int(ost_result.group(3)) * 1024
-                storage_dict[mount_point_info].ost.free += int(ost_result.group(4)) * 1024
-
-        elif tail_result:
-
-            if tail_found or not header_found:
-                raise RuntimeError("Tail found before header")
-
-            header_found = False
-            tail_found = True
-            mount_point_info = None
-
-        else:
-            logging.error("Line mismatch, skipped line: %s", stripped_line)
+                else:
+                    raise RuntimeError("Target is neither MDT or OST: %s" % line)
 
     if logging.getLogger().isEnabledFor(logging.DEBUG):
 
