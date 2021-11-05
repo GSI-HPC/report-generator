@@ -269,74 +269,40 @@ def create_storage_info(file_system, input_file=None):
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
 
-    mount_point_info = None
-
     blocks = REGEX_STORAGE_PATTERN_BLOCK.findall(input_data)
 
     for block in blocks:
 
-        lines = block.splitlines()
+        mount_point_info = None
 
-        if not REGEX_STORAGE_PATTERN_TAIL.match(lines[len(lines)-1]):
-            raise RuntimeError("Missing filesystem_symmary line in block: %s" % block)
+        for line in block.splitlines():
 
-        i = 1
-
-        while i < len(lines):
-
-            result = REGEX_STORAGE_PATTERN_DATA.match(lines[i])
-
-            if not lines[i]:
-                i += 1
+            if not line:
                 continue
 
-            if i == len(lines):
-                mount_point_info = None
+            result = REGEX_STORAGE_PATTERN_DATA.match(line)
 
             if result:
 
+                if not mount_point_info:
+
+                    mount_point_info = result.group(StorageUsageCapturing.MOUNTPOINT)
+                    storage_dict[mount_point_info] = StorageInfo(mount_point_info)
+
                 if result.group(StorageUsageCapturing.TARGET) == "MDT":
 
-                    if not mount_point_info:
-
-                        mount_point_info = result.group(StorageUsageCapturing.MOUNTPOINT)
-                        storage_dict[mount_point_info] = StorageInfo(mount_point_info)
-                        storage_dict[mount_point_info].mdt.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
-                        storage_dict[mount_point_info].mdt.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
-                        storage_dict[mount_point_info].mdt.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
-
-                    else:
-
-                        storage_dict[mount_point_info].mdt.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
-                        storage_dict[mount_point_info].mdt.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
-                        storage_dict[mount_point_info].mdt.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
+                    storage_dict[mount_point_info].mdt.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
+                    storage_dict[mount_point_info].mdt.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
+                    storage_dict[mount_point_info].mdt.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
 
                 elif result.group(StorageUsageCapturing.TARGET) == "OST":
 
-                    if not mount_point_info:
-
-                        mount_point_info = result.group(StorageUsageCapturing.MOUNTPOINT)
-                        storage_dict[mount_point_info] = StorageInfo(mount_point_info)
-                        storage_dict[mount_point_info].ost.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
-                        storage_dict[mount_point_info].ost.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
-                        storage_dict[mount_point_info].ost.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
-
-                    else:
-
-                        storage_dict[mount_point_info].ost.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
-                        storage_dict[mount_point_info].ost.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
-                        storage_dict[mount_point_info].ost.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
+                    storage_dict[mount_point_info].ost.total += int(result.group(StorageUsageCapturing.KBYTES_TOTAL)) * 1024
+                    storage_dict[mount_point_info].ost.used += int(result.group(StorageUsageCapturing.KBYTES_USED)) * 1024
+                    storage_dict[mount_point_info].ost.free += int(result.group(StorageUsageCapturing.KBYTES_FREE)) * 1024
 
                 else:
-                    raise RuntimeError("Target is neither MDT or OST: %s" % lines[i])
-
-            elif REGEX_STORAGE_PATTERN_TAIL.match(lines[i]):
-                mount_point_info = None
-            else:
-                raise RuntimeError("PLATZHALTER")
-
-
-            i += 1
+                    raise RuntimeError("Target is neither MDT or OST: %s" % line)
 
     if logging.getLogger().isEnabledFor(logging.DEBUG):
 
