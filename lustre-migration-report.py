@@ -14,9 +14,10 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from decimal import Decimal
 
 import configparser
 import datetime
@@ -24,18 +25,15 @@ import argparse
 import logging
 import sys
 import os
-from decimal import Decimal
-
-import dataset.item_handler as ih
-import filter.group_filter_handler as gf
 
 from dataset.lfs_dataset_handler import create_group_info_list
 from chart.group_files_migration_bar_chart import GroupFilesMigrationBarChart
-
 from utils.matplotlib_ import check_matplotlib_version
 from utils.rsync_ import transfer_report
 from utils.getent_group import get_user_groups
 
+import dataset.item_handler as ih
+import filter.group_filter_handler as gf
 
 # TODO: Remove config parameter...
 def create_report(local_mode, chart_dir, fs1_name, fs2_name, config):
@@ -105,7 +103,6 @@ def create_report(local_mode, chart_dir, fs1_name, fs2_name, config):
 
     return reports_path_list
 
-
 def main():
 
     parser = argparse.ArgumentParser(description='Storage Report Generator.')
@@ -159,16 +156,8 @@ def main():
 
         return 0
 
-    except Exception as e:
-
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-
-        error_msg = "Caught exception (%s): %s - %s (line: %s)" % (
-        exc_type, str(e), filename, exc_tb.tb_lineno)
-
-        logging.error(error_msg)
-
+    except Exception:
+        logging.exception('Caught exception in main')
 
 if __name__ == '__main__':
    main()

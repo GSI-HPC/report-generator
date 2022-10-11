@@ -202,7 +202,6 @@ def create_group_info_list(file_system, input_file=None):
     if not isinstance(input_data, str):
         raise RuntimeError("Expected input data to be string, got: %s" % type(input_data))
 
-
     blocks = REGEX_QUOTA_PATTERN_BLOCK.findall(input_data)
 
     for block in blocks:

@@ -14,21 +14,16 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
 
 import configparser
 import datetime
 import argparse
 import logging
-import sys
 import os
 
 import dateutil.relativedelta
-
-import dataset.item_handler as ih
-import filter.group_filter_handler as gf
 
 from chart.trend_chart import TrendChart
 from dataset.lfsdb_quota_history import QuotaHistoryTable
@@ -37,6 +32,7 @@ from utils.rsync_ import transfer_report
 from utils.pandas_ import create_data_frame_weekly
 from utils.getent_group import get_user_groups
 
+import dataset.item_handler as ih
 
 def create_usage_trend_chart(local_mode,
                              fs_long_name,
@@ -84,7 +80,6 @@ def create_usage_trend_chart(local_mode,
 
     return chart_path
 
-
 def create_quota_trend_chart(local_mode,
                              fs_long_name,
                              chart_dir,
@@ -101,8 +96,8 @@ def create_quota_trend_chart(local_mode,
         groups = get_user_groups()
 
         item_list = \
-            quota_history_table.get_time_series_group_quota_usage(start_date, 
-                                                                  end_date, 
+            quota_history_table.get_time_series_group_quota_usage(start_date,
+                                                                  end_date,
                                                                   groups)
 
     group_item_dict = ih.create_group_date_value_item_dict(item_list)
@@ -123,7 +118,6 @@ def create_quota_trend_chart(local_mode,
 
     return chart_path
 
-
 def main():
 
     parser = argparse.ArgumentParser(
@@ -143,7 +137,7 @@ def main():
     args = parser.parse_args()
 
     if not os.path.isfile(args.config_file):
-        raise IOError("The config file does not exist or is not a file: %s" % 
+        raise IOError("The config file does not exist or is not a file: %s" %
             args.config_file)
 
     logging_level = logging.INFO
@@ -151,7 +145,7 @@ def main():
     if args.enable_debug:
         logging_level = logging.DEBUG
 
-    logging.basicConfig( 
+    logging.basicConfig(
         level=logging_level, format='%(asctime)s - %(levelname)s: %(message)s')
 
     try:
@@ -176,10 +170,10 @@ def main():
 
         date_format = config.get("time_series_chart", "date_format")
         prev_months = config.getint("time_series_chart", "prev_months")
-        
+
         usage_trend_chart = config.get('usage_trend_chart', 'filename')
         threshold = config.get('usage_trend_chart', 'threshold')
-        
+
         quota_trend_chart = config.get('quota_trend_chart', 'filename')
 
         quota_history_table = \
@@ -235,16 +229,8 @@ def main():
 
         return 0
 
-    except Exception as e:
-
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-
-        error_msg = "Caught exception (%s): %s - %s (line: %s)" % \
-            (exc_type, str(e), filename, exc_tb.tb_lineno)
-
-        logging.error(error_msg)
-
+    except Exception:
+        logging.exception('Caught exception in main')
 
 if __name__ == '__main__':
     main()

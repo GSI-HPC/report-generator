@@ -14,33 +14,26 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
+from decimal import Decimal
 
 import configparser
 import datetime
 import argparse
 import logging
-import sys
 import os
-
-import dataset.lfs_dataset_handler as ldh
-import dataset.item_handler as ih
-
-import filter.group_filter_handler as gf
-
-from decimal import Decimal
 
 from chart.quota_pct_bar_chart import QuotaPctBarChart
 from chart.usage_quota_bar_chart import UsageQuotaBarChart
 from chart.usage_pie_chart import UsagePieChart
-
 from utils.matplotlib_ import check_matplotlib_version
 from utils.rsync_ import transfer_report
-from utils.getent_group import get_user_groups
 
-from subprocess import check_output
+import dataset.lfs_dataset_handler as ldh
+import dataset.item_handler as ih
+import filter.group_filter_handler as gf
 
 def create_weekly_reports(local_mode,
                           chart_dir,
@@ -69,9 +62,7 @@ def create_weekly_reports(local_mode,
 
     else:
 
-        group_names_list = get_user_groups()
-
-        group_info_list = gf.filter_group_info_items(ldh.create_group_info_list(group_names_list, file_system))
+        group_info_list = gf.filter_group_info_items(ldh.create_group_info_list(file_system))
 
         storage_total_size = ldh.lustre_total_size(file_system) * Decimal(storage_multiplier)
 
@@ -107,7 +98,6 @@ def create_weekly_reports(local_mode,
     reports_path_list.append(chart_path)
 
     return reports_path_list
-
 
 def main():
 
@@ -195,15 +185,8 @@ def main():
 
         return 0
 
-    except Exception as e:
-
-        exc_type, exc_obj, exc_tb = sys.exc_info()
-        filename = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-
-        error_msg = "Caught exception (%s): %s - %s (line: %s)" % (
-        exc_type, str(e), filename, exc_tb.tb_lineno)
-
-        logging.error(error_msg)
+    except Exception:
+        logging.exception('Caught exception in main')
 
 if __name__ == '__main__':
    main()
