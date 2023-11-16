@@ -1,27 +1,16 @@
 #!/usr/bin/env python3
+#
 # -*- coding: utf-8 -*-
 #
-# Copyright 2019 Gabriele Iannetti <g.iannetti@gsi.de>
+# © Copyright 2023 GSI Helmholtzzentrum für Schwerionenforschung
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
+# This software is distributed under
+# the terms of the GNU General Public Licence version 3 (GPL Version 3),
+# copied verbatim in the file "LICENCE".
 
 import datetime
 
 from decimal import Decimal
-
 
 class GroupInfoItem:
 
@@ -32,7 +21,6 @@ class GroupInfoItem:
         self.quota = Decimal(quota)
         self.files = Decimal(files)
 
-
 class GroupFilesMigrationInfoItem:
 
     def __init__(self, name, fs1_file_count, fs2_file_count):
@@ -40,7 +28,6 @@ class GroupFilesMigrationInfoItem:
         self.name = name
         self.fs1_file_count = Decimal(fs1_file_count)
         self.fs2_file_count = Decimal(fs2_file_count)
-
 
 class GroupDateValueItem:
 
@@ -55,7 +42,6 @@ class GroupDateValueItem:
         self.name = name
         self.date = date
         self.value = value
-
 
 def create_group_date_value_item_dict(group_date_value_item_list):
 
@@ -77,7 +63,6 @@ def create_group_date_value_item_dict(group_date_value_item_list):
             item_dict[item.name][1].append(item.value)
 
     return item_dict
-
 
 def create_dummy_group_info_list(number=None):
 
@@ -129,7 +114,6 @@ def create_dummy_group_info_list(number=None):
     else:
         return group_info_list
 
-
 def create_dummy_group_date_values(num_groups=3, max_value=100):
     """
         Date interval is from 2018-12-01 to 2018-12-31.
@@ -157,7 +141,6 @@ def create_dummy_group_date_values(num_groups=3, max_value=100):
                 GroupDateValueItem(group, date, value))
 
     return group_date_size_item_list
-
 
 def create_dummy_group_files_migration_info_list():
 

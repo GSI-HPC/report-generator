@@ -1,36 +1,24 @@
 #!/usr/bin/env python3
+#
 # -*- coding: utf-8 -*-
 #
-# Copyright 2019 Gabriele Iannetti <g.iannetti@gsi.de>
+# © Copyright 2023 GSI Helmholtzzentrum für Schwerionenforschung
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
+# This software is distributed under
+# the terms of the GNU General Public Licence version 3 (GPL Version 3),
+# copied verbatim in the file "LICENCE".
 
 import logging
 import pandas as pd
 
-
 THRESHOLD_DAYS = 28
-
 
 def create_data_frame_weekly(item_dict):
 
     data_frame = pd.DataFrame()
 
     for group_name in item_dict:
-        
+
         if len(item_dict[group_name][0]) >= THRESHOLD_DAYS:
 
             dates = pd.DatetimeIndex(
@@ -49,13 +37,13 @@ def create_data_frame_weekly(item_dict):
             else:
 
                 logging.warning(
-                    "Ignoring group with to small date delta: '%s'" 
+                    "Ignoring group with to small date delta: '%s'"
                         % group_name)
 
         else:
 
             logging.warning(
-                "Ignoring group with insufficient data points: '%s'" 
+                "Ignoring group with insufficient data points: '%s'"
                     % group_name)
 
             continue

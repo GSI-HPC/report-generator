@@ -1,30 +1,18 @@
 #!/usr/bin/env python3
+#
 # -*- coding: utf-8 -*-
 #
-# Copyright 2019 Gabriele Iannetti <g.iannetti@gsi.de>
+# © Copyright 2023 GSI Helmholtzzentrum für Schwerionenforschung
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
+# This software is distributed under
+# the terms of the GNU General Public Licence version 3 (GPL Version 3),
+# copied verbatim in the file "LICENCE".
 
 import MySQLdb
 import logging
 
 from contextlib import closing
-
 from dataset.item_handler import GroupDateValueItem
-
 
 class QuotaHistoryTable:
 
@@ -51,33 +39,33 @@ class QuotaHistoryTable:
         """
 
         results = list()
-    
+
         with closing(MySQLdb.connect(host=self._host,
                                      user=self._user,
                                      passwd=self._passwd,
                                      db=self._db)) \
                                         as conn:
-    
+
             with closing(conn.cursor()) as cur:
-    
+
                 sql = "SELECT gid "\
                       "FROM %s "\
                       "WHERE date BETWEEN '%s' AND '%s' "\
                       % (self._table, start_date, end_date)
-    
+
                 if groups:
                     sql += "AND gid IN (%s) " % str(groups).strip('[]')
-    
+
                 sql += "AND used >= %s "\
                        "GROUP BY gid"\
                        % threshold
-    
+
                 logging.debug(sql)
                 cur.execute(sql)
-    
+
                 for item in cur.fetchall():
                     results.append(item[0].decode())
-    
+
         return results
 
     def get_time_series_group_sizes(self, start_date, end_date, groups=None):
@@ -110,7 +98,7 @@ class QuotaHistoryTable:
 
                 if groups:
                     sql += "AND gid IN (%s) " % str(groups).strip('[]')
-    
+
                 sql += 'GROUP BY gid, date'
 
                 logging.debug(sql)
@@ -132,9 +120,9 @@ class QuotaHistoryTable:
 
         return results
 
-    def get_time_series_group_quota_usage(self, 
-                                          start_date, 
-                                          end_date, 
+    def get_time_series_group_quota_usage(self,
+                                          start_date,
+                                          end_date,
                                           groups=None):
         """
         Queries GROUP-QUOTA-History table for given groups
@@ -152,9 +140,9 @@ class QuotaHistoryTable:
                                      passwd=self._passwd,
                                      db=self._db)) \
                                         as conn:
-    
+
             with closing(conn.cursor()) as cur:
-    
+
                 sql = "SELECT gid, "\
                       "       date, "\
                       "       IF(quota=0, 0, ROUND((used / quota) * 100, 0)) "\
@@ -162,12 +150,12 @@ class QuotaHistoryTable:
                       "FROM %s " \
                       "WHERE date between '%s' AND '%s' " \
                       % (self._table, start_date, end_date)
-    
+
                 if groups:
                     sql += "AND gid IN (%s) " % str(groups).strip('[]')
 
                 sql += 'GROUP BY gid, date'
-    
+
                 logging.debug(sql)
                 cur.execute(sql)
 
@@ -184,5 +172,5 @@ class QuotaHistoryTable:
 
                 if not results:
                     raise RuntimeError("Found empty result list!")
-    
+
         return results

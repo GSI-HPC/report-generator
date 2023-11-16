@@ -1,22 +1,12 @@
 #!/usr/bin/env python3
+#
 # -*- coding: utf-8 -*-
 #
-# Copyright 2019 Gabriele Iannetti <g.iannetti@gsi.de>
+# © Copyright 2023 GSI Helmholtzzentrum für Schwerionenforschung
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
+# This software is distributed under
+# the terms of the GNU General Public Licence version 3 (GPL Version 3),
+# copied verbatim in the file "LICENCE".
 
 from chart.base_chart import BaseChart
 
@@ -41,12 +31,12 @@ class GroupFilesMigrationBarChart(BaseChart):
 
         self.fs1_name = fs1_name
         self.fs2_name = fs2_name
-    
+
     def _draw(self):
-        
+
         self._sort_dataset(
             key=lambda group_info: group_info.fs1_file_count, reverse=True)
-        
+
         max_y = float(self.dataset[0].fs1_file_count)
 
         num_groups = len(self.dataset)
@@ -66,8 +56,8 @@ class GroupFilesMigrationBarChart(BaseChart):
         bar_width = 0.35  # the width of the bars: can also be len(x) sequence
 
         p1 = self._ax.bar(ind, fs1_file_count_values, bar_width, color='blue')
-        
-        p2 = self._ax.bar(ind + bar_width, fs2_file_count_values, 
+
+        p2 = self._ax.bar(ind + bar_width, fs2_file_count_values,
                           bar_width, color='orange')
 
         self._ax.set_xticks(ind + bar_width / 2)

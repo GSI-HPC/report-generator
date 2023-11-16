@@ -1,22 +1,12 @@
 #!/usr/bin/env python3
+#
 # -*- coding: utf-8 -*-
 #
-# Copyright 2018 Gabriele Iannetti <g.iannetti@gsi.de>
+# © Copyright 2023 GSI Helmholtzzentrum für Schwerionenforschung
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-
+# This software is distributed under
+# the terms of the GNU General Public Licence version 3 (GPL Version 3),
+# copied verbatim in the file "LICENCE".
 
 from chart.base_chart import BaseChart
 
@@ -27,7 +17,6 @@ import matplotlib
 # Force matplotlib to not use any X window backend.
 matplotlib.use('Agg')
 
-
 class UsageQuotaBarChart(BaseChart):
 
     def __init__(self, title, dataset, file_path):
@@ -35,16 +24,16 @@ class UsageQuotaBarChart(BaseChart):
         super(UsageQuotaBarChart, self).__init__(title, dataset, file_path,
                                                  x_label='Group',
                                                  y_label='Disk Space / Quota Used (TiB)')
-    
+
     def _draw(self):
-        
+
         num_groups = len(self.dataset)
-        
+
         self._sort_dataset(
             key=lambda group_info: group_info.quota, reverse=True)
-        
+
         tick_width_y = 200
-        
+
         max_y = float(self.dataset[0].quota /
                       number_format.TIB_DIVISIOR) + tick_width_y
 
